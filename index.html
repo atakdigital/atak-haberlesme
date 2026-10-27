@@ -41,15 +41,17 @@
         .disaster-pulse { animation: pulse-red 1.5s infinite; }
         @keyframes pulse-red {
             0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
-            70% { box-shadow: 0 0 0 15px rgba(220, 38, 38, 0); }
+            70% { box-shadow: 0 0 0 20px rgba(220, 38, 38, 0); }
             100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
         }
     </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col">
 
+    <!-- APP CONTAINER -->
     <div id="app" class="flex-1 flex flex-col min-h-screen"></div>
 
+    <!-- SCRIPT LOGIC -->
     <script>
         const SUPABASE_URL = "https://iywgxfemglgixjplenyw.supabase.co";
         const SUPABASE_KEY = "sb_publishable_FNlMWgu7kmECpYbDLkC3BA_9emOSPy4";
@@ -85,17 +87,19 @@
                 }
             }
             await fetchAllData();
+            initRealtimeListener();
             render();
         }
 
         async function fetchAllData() {
-            const [mRes, dRes, aRes, rRes, repRes, repPortRes] = await Promise.all([
+            const [mRes, dRes, aRes, rRes, repRes, repPortRes, sysRes] = await Promise.all([
                 supabaseClient.from('members').select('*'),
                 supabaseClient.from('dues').select('*, members(full_name)'),
                 supabaseClient.from('announcements').select('*'),
                 supabaseClient.from('field_activities').select('*'),
                 supabaseClient.from('repeaters').select('*'),
-                supabaseClient.from('reports').select('*')
+                supabaseClient.from('reports').select('*'),
+                supabaseClient.from('system_settings').select('*').eq('key', 'disaster_mode').single()
             ]);
 
             if (mRes.data) state.users = mRes.data;
@@ -111,11 +115,33 @@
             if (rRes.data) state.activities = rRes.data;
             if (repRes.data) state.repeaters = repRes.data;
             if (repPortRes.data) state.reports = repPortRes.data;
+            if (sysRes.data) state.disasterMode = sysRes.data.value === 'true';
         }
 
-        function toggleDisasterMode() {
-            state.disasterMode = !state.disasterMode;
-            showNotification(state.disasterMode ? '🚨 Afet modu aktifleştirildi.' : 'Afet modu kapatıldı.', state.disasterMode ? 'danger' : 'info');
+        // Supabase Realtime Dinleyicisi (Tüm cihazlarda anlık alarm tetikler)
+        function initRealtimeListener() {
+            supabaseClient
+                .channel('public:system_settings')
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'system_settings' }, payload => {
+                    if (payload.new.key === 'disaster_mode') {
+                        state.disasterMode = payload.new.value === 'true';
+                        render();
+                    }
+                })
+                .subscribe();
+        }
+
+        async function toggleDisasterMode() {
+            const newStatus = !state.disasterMode;
+            // Veritabanındaki global durumu güncelliyoruz (Böylece bağlı olan herkes anında görecek)
+            await supabaseClient.from('system_settings').upsert({ key: 'disaster_mode', value: newStatus ? 'true' : 'false' });
+            
+            state.disasterMode = newStatus;
+            if (state.disasterMode) {
+                showNotification('🚨 Kırmızı Alarm! Tüm kullanıcılara afet sinyali gönderildi.', 'danger');
+            } else {
+                showNotification('Afet modu kapatıldı.', 'info');
+            }
             render();
         }
 
@@ -170,6 +196,40 @@
             `;
         }
 
+        // Tüm ekranları kaplayan Acil Afet Alarm Modalı
+        function renderGlobalDisasterModal() {
+            if (!state.disasterMode) return '';
+            return `
+                <div class="fixed inset-0 bg-red-950/90 z-50 flex items-center justify-center p-6 backdrop-blur-md disaster-pulse">
+                    <div class="bg-slate-950 border-4 border-red-600 rounded-3xl p-8 max-w-xl w-full text-center space-y-6 shadow-2xl shadow-red-600/50">
+                        <div class="w-24 h-24 bg-red-600 text-white rounded-full flex items-center justify-center mx-auto text-4xl animate-bounce shadow-lg shadow-red-600/60">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                        <div class="space-y-2">
+                            <h1 class="text-3xl font-black text-red-500 tracking-wider">KIRMIZI ALARM!</h1>
+                            <p class="text-lg font-bold text-slate-100">ACİL AFET HABERLEŞME DURUMU TETİKLENDİ</p>
+                            <p class="text-xs text-slate-400 leading-relaxed">Dernek yönetimi tarafından olağanüstü afet durumu ilan edilmiştir. Lütfen telsizlerinizi ilgili acil durum frekanslarına ayarlayın ve operasyon talimatlarını bekleyin.</p>
+                        </div>
+                        <div class="p-4 bg-red-950/60 border border-red-800 rounded-xl text-red-300 text-xs font-mono">
+                            📡 AKTİF ÇAĞRI KANALI: 145.500 MHz / RÖLE: TA1KAS
+                        </div>
+                        ${hasPermission(state.currentUser?.role) ? `
+                            <button onclick="toggleDisasterMode()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer">
+                                Afet Modunu Kapat (Yönetim Yetkisi)
+                            </button>
+                        ` : `
+                            <div class="text-[11px] text-slate-500 italic">Bu uyarı merkezi sunucudan anlık olarak iletilmiştir.</div>
+                        `}
+                    </div>
+                </div>
+            `;
+        }
+
+        function hasPermission(role) {
+            const managementRoles = ['Yönetim Kurulu Başkanı', 'Başkan Yardımcısı', 'Genel Sekreter', 'Sayman'];
+            return managementRoles.includes(role);
+        }
+
         function renderAuthScreen() {
             return `
                 <div class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-red-950">
@@ -212,7 +272,7 @@
                             <div><h1 class="font-bold text-slate-100 text-base">ATAK YÖNETİM PANELİ</h1><p class="text-[10px] text-red-500 font-bold uppercase">Acil Afet Haberleşme Derneği</p></div>
                         </div>
                         <button onclick="toggleDisasterMode()" class="ml-6 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-2 ${state.disasterMode ? 'bg-red-600 text-white disaster-pulse animate-bounce' : 'bg-red-950/40 text-red-400 border border-red-800'} cursor-pointer">
-                            <i class="fa-solid fa-triangle-exclamation"></i><span>${state.disasterMode ? 'AFET MODU AKTİF' : 'AFET MODUNU TETİKLE'}</span>
+                            <i class="fa-solid fa-triangle-exclamation"></i><span>${state.disasterMode ? 'AFET MODU AKTİF (KAPAT)' : 'AFET MODUNU TETİKLE'}</span>
                         </button>
                     </div>
                     <div class="flex items-center space-x-4">
@@ -552,7 +612,7 @@
 
         function render() {
             const root = document.getElementById('app');
-            if (!state.currentUser) { root.innerHTML = renderAuthScreen() + renderNotification(); return; }
+            if (!state.currentUser) { root.innerHTML = renderAuthScreen() + renderNotification() + renderGlobalDisasterModal(); return; }
 
             let content = '';
             switch(state.activeTab) {
@@ -574,6 +634,7 @@
                     <main class="flex-1 p-6 overflow-y-auto">${content}</main>
                 </div>
                 ${renderNotification()}
+                ${renderGlobalDisasterModal()}
                 <div id="universal-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
                     <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-lg shadow-2xl relative">
                         <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-800">
