@@ -99,7 +99,14 @@
             ]);
 
             if (mRes.data) state.users = mRes.data;
-            if (dRes.data) state.fees = dRes.data.map(d => ({ id: d.id, memberName: d.members?.full_name || 'Üye', amount: d.amount, date: d.created_at?.split('T')[0] || '2026', method: 'Banka Havalesi' }));
+            if (dRes.data) state.fees = dRes.data.map(d => ({
+                id: d.id,
+                memberName: d.members?.full_name || 'Üye',
+                amount: d.amount,
+                month: d.month || 'Ocak',
+                year: d.year || 2026,
+                status: d.status || 'Ödendi'
+            }));
             if (aRes.data) state.announcements = aRes.data;
             if (rRes.data) state.activities = rRes.data;
             if (repRes.data) state.repeaters = repRes.data;
@@ -252,10 +259,10 @@
             return `
                 <div class="space-y-6">
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Toplam Onaylı Üye</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${approvedUsers.length}</h3></div><div class="w-12 h-12 bg-blue-950/60 border border-blue-800 text-blue-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-users"></i></div></div>
-                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Toplam Aidat Tahsilatı</p><h3 class="text-2xl font-bold text-slate-100 mt-1">₺${totalFees.toLocaleString()}</h3></div><div class="w-12 h-12 bg-emerald-950/60 border border-emerald-800 text-emerald-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-turkish-lira-sign"></i></div></div>
-                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Aktif Saha Faaliyetleri</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${state.activities.length}</h3></div><div class="w-12 h-12 bg-amber-950/60 border border-amber-800 text-amber-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-person-hiking"></i></div></div>
-                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Onay Bekleyen Üye</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${pendingUsers.length}</h3></div><div class="w-12 h-12 bg-purple-950/60 border border-purple-800 text-purple-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-user-clock"></i></div></div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Toplam Onaylı Üye</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${approvedUsers.length}</h3></div><div class="w-12 h-12 bg-blue-950/65 border border-blue-800 text-blue-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-users"></i></div></div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Toplam Aidat Tahsilatı</p><h3 class="text-2xl font-bold text-slate-100 mt-1">₺${totalFees.toLocaleString()}</h3></div><div class="w-12 h-12 bg-emerald-950/65 border border-emerald-800 text-emerald-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-turkish-lira-sign"></i></div></div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Aktif Saha Faaliyetleri</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${state.activities.length}</h3></div><div class="w-12 h-12 bg-amber-950/65 border border-amber-800 text-amber-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-person-hiking"></i></div></div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Onay Bekleyen Üye</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${pendingUsers.length}</h3></div><div class="w-12 h-12 bg-purple-950/65 border border-purple-800 text-purple-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-user-clock"></i></div></div>
                     </div>
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><h4 class="font-bold text-slate-200 text-sm mb-4">Üye Kan Grubu Dağılımı</h4><div class="h-64 flex items-center justify-center"><canvas id="chartBloodGroup"></canvas></div></div>
@@ -303,12 +310,29 @@
         function renderFeesView() {
             return `
                 <div class="space-y-6">
-                    <div class="flex items-center justify-between"><div><h2 class="text-lg font-bold text-slate-100">Aidat & Finans Takibi</h2></div><button onclick="openAddDueModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Aidat Ekle</button></div>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-100">💰 Aylık Aidat & Finans Takibi</h2>
+                            <p class="text-xs text-slate-400">Üyelerin aylık ödemeleri ve tahsilat takvimi</p>
+                        </div>
+                        <button onclick="openAddDueModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Aylık Aidat Tahsil Et</button>
+                    </div>
                     <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
                         <table class="w-full text-left text-xs text-slate-300">
-                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]"><tr><th class="px-4 py-3">Üye Adı</th><th class="px-4 py-3">Tutar</th><th class="px-4 py-3">Sezon</th><th class="px-4 py-3 text-right">İşlem</th></tr></thead>
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
+                                <tr><th class="px-4 py-3">Üye Adı</th><th class="px-4 py-3">Aidat Ayı</th><th class="px-4 py-3">Yıl</th><th class="px-4 py-3">Tutar</th><th class="px-4 py-3">Durum</th><th class="px-4 py-3 text-right">İşlem</th></tr>
+                            </thead>
                             <tbody class="divide-y divide-slate-800">
-                                ${state.fees.map(f => `<tr class="hover:bg-slate-800/50"><td class="px-4 py-3 font-semibold text-slate-100">${f.memberName}</td><td class="px-4 py-3 text-emerald-400 font-bold">₺${f.amount}</td><td class="px-4 py-3 text-slate-400">${f.date}</td><td class="px-4 py-3 text-right"><button onclick="deleteDue('${f.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></td></tr>`).join('')}
+                                ${state.fees.map(f => `
+                                    <tr class="hover:bg-slate-800/50">
+                                        <td class="px-4 py-3 font-semibold text-slate-100">${f.memberName}</td>
+                                        <td class="px-4 py-3 text-blue-400 font-bold"><i class="fa-solid fa-calendar-days mr-1"></i> ${f.month}</td>
+                                        <td class="px-4 py-3 text-slate-400">${f.year}</td>
+                                        <td class="px-4 py-3 text-emerald-400 font-bold">₺${f.amount}</td>
+                                        <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400">Ödendi</span></td>
+                                        <td class="px-4 py-3 text-right"><button onclick="deleteDue('${f.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer" title="Sil"><i class="fa-solid fa-trash-can"></i></button></td>
+                                    </tr>
+                                `).join('')}
                             </tbody>
                         </table>
                     </div>
@@ -425,6 +449,65 @@
             render();
         }
 
+        async function openAddDueModal() {
+            const { data: members } = await supabaseClient.from('members').select('id, full_name');
+            const opts = members ? members.map(m => `<option value="${m.id}">${m.full_name}</option>`).join('') : '';
+            const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+            
+            openModal("Aylık Aidat Tahsilatı", `
+                <form onsubmit="handleAddDue(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Üye Seçin</label>
+                        <select id="due-member" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">${opts}</select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Aidat Ayı</label>
+                            <select id="due-month" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
+                                ${months.map(m => `<option>${m}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Yıl</label>
+                            <input type="number" id="due-year" value="2026" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Tutar (₺)</label>
+                        <input type="number" id="due-amount" required value="500" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
+                    </div>
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer mt-2">Aidat Ödemesini Kaydet</button>
+                </form>
+            `);
+        }
+
+        async function handleAddDue(e) {
+            e.preventDefault();
+            const member_id = document.getElementById('due-member').value;
+            const month = document.getElementById('due-month').value;
+            const year = parseInt(document.getElementById('due-year').value);
+            const amount = parseFloat(document.getElementById('due-amount').value);
+
+            const { error } = await supabaseClient.from('dues').insert([{ member_id, month, year, amount, status: 'Ödendi' }]);
+            if (error) {
+                showNotification("Aidat Ekleme Hatası: " + error.message, 'danger');
+            } else {
+                showNotification("Aylık aidat başarıyla kaydedildi.");
+                closeModal();
+                await fetchAllData();
+                render();
+            }
+        }
+
+        function openAddRepeaterModal() {
+            openModal("Röle Ekle", `<form onsubmit="handleAddRepeater(event)" class="space-y-3"><input type="text" id="rpt-name" required placeholder="Röle Adı" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><input type="text" id="rpt-freq" required placeholder="Frekans" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><button type="submit" class="w-full bg-red-600 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button></form>`);
+        }
+        async function handleAddRepeater(e) {
+            e.preventDefault();
+            await supabaseClient.from('repeaters').insert([{ name: document.getElementById('rpt-name').value, frequency: document.getElementById('rpt-freq').value }]);
+            closeModal(); await fetchAllData(); render();
+        }
+
         function openAddReportModal() {
             openModal("Detaylı Rapor Ekle", `
                 <form onsubmit="handleAddReport(event)" class="space-y-3">
@@ -437,35 +520,7 @@
         }
         async function handleAddReport(e) {
             e.preventDefault();
-            const title = document.getElementById('rep-title').value;
-            const category = document.getElementById('rep-cat').value;
-            const description = document.getElementById('rep-desc').value;
-
-            try {
-                await supabaseClient.from('reports').insert([{ title, category, description }]);
-            } catch (err) {
-                await supabaseClient.from('reports').insert([{ title, category }]);
-            }
-            closeModal(); await fetchAllData(); render();
-        }
-
-        async function openAddDueModal() {
-            const { data: members } = await supabaseClient.from('members').select('id, full_name');
-            const opts = members ? members.map(m => `<option value="${m.id}">${m.full_name}</option>`).join('') : '';
-            openModal("Aidat Ekle", `<form onsubmit="handleAddDue(event)" class="space-y-3"><select id="due-member" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">${opts}</select><input type="number" id="due-amount" required value="500" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><button type="submit" class="w-full bg-emerald-600 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button></form>`);
-        }
-        async function handleAddDue(e) {
-            e.preventDefault();
-            await supabaseClient.from('dues').insert([{ member_id: document.getElementById('due-member').value, amount: parseFloat(document.getElementById('due-amount').value), status: 'Ödendi' }]);
-            closeModal(); await fetchAllData(); render();
-        }
-
-        function openAddRepeaterModal() {
-            openModal("Röle Ekle", `<form onsubmit="handleAddRepeater(event)" class="space-y-3"><input type="text" id="rpt-name" required placeholder="Röle Adı" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><input type="text" id="rpt-freq" required placeholder="Frekans" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><button type="submit" class="w-full bg-red-600 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button></form>`);
-        }
-        async function handleAddRepeater(e) {
-            e.preventDefault();
-            await supabaseClient.from('repeaters').insert([{ name: document.getElementById('rpt-name').value, frequency: document.getElementById('rpt-freq').value }]);
+            await supabaseClient.from('reports').insert([{ title: document.getElementById('rep-title').value, category: document.getElementById('rep-cat').value, description: document.getElementById('rep-desc').value }]);
             closeModal(); await fetchAllData(); render();
         }
 
