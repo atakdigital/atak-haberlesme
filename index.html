@@ -11,13 +11,6 @@
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen flex flex-col">
 
-    <script>
-        const SUPABASE_URL = "https://iywgxfemglgixjplenyw.supabase.co";
-        const SUPABASE_KEY = "sb_publishable_FNfMMugx7kaECpYbDLkC3BA_9eeO5Py1";
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        let currentUser = null;
-    </script>
-
     <!-- AUTH CONTAINER -->
     <div id="auth-container" class="flex-1 flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl w-full max-w-md shadow-2xl">
@@ -83,13 +76,20 @@
                 </div>
             </div>
             <nav class="flex-1 p-4 space-y-1">
-                <button onclick="switchTab('dashboard')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition nav-btn">
+                <button onclick="switchTab('dashboard')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
                     <i class="fa-solid fa-chart-pie w-5"></i><span>Genel Bakış</span>
                 </button>
-                <button onclick="switchTab('members')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition nav-btn">
+                <button onclick="switchTab('members')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
                     <i class="fa-solid fa-users w-5"></i><span>Üye Yönetimi</span>
                 </button>
-                <button onclick="switchTab('dues')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition nav-btn">
+                <button onclick="switchTab('dues')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
                     <i class="fa-solid fa-wallet w-5"></i><span>Aidat Takibi</span>
                 </button>
-                <button onclick="switchTab('activities')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font
+                <button onclick="switchTab('activities')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                    <i class="fa-solid fa-map-location-dot w-5"></i><span>Saha Faaliyetleri</span>
+                </button>
+                <button onclick="switchTab('announcements')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                    <i class="fa-solid fa-bullhorn w-5"></i><span>Duyurular</span>
+                </button>
+                <button onclick="switchTab('reports')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                    <i class="fa-solid fa-chart-line w-
