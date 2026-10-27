@@ -281,7 +281,7 @@
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="font-bold text-lg">Aidat & Finans Takibi</h3>
-                            ${isManagement() ? `<button onclick="showAddDueModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2 rounded-lg font-semibold transition">+ Aidat Ekle</button>` : ''}
+                            ${isManagement() ? `<button onclick="showAddDueModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2 rounded-lg font-semibold transition cursor-pointer">+ Aidat Ekle</button>` : ''}
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-sm">
@@ -301,7 +301,7 @@
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
                         <div class="flex justify-between items-center">
                             <h3 class="font-bold text-lg text-red-400"><i class="fa-solid fa-tower-broadcast"></i> Afet & Telsiz Haberleşme Frekansları</h3>
-                            ${isManagement() ? `<button onclick="showAddRepeaterModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2 rounded-lg font-semibold transition">+ Röle / Frekans Ekle</button>` : ''}
+                            ${isManagement() ? `<button onclick="showAddRepeaterModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2 rounded-lg font-semibold transition cursor-pointer">+ Röle / Frekans Ekle</button>` : ''}
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4" id="repeaters-grid">
                             <p class="text-slate-400 text-sm">Röleler yükleniyor...</p>
@@ -321,7 +321,7 @@
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="font-bold text-lg">Saha Faaliyetleri ve Tatbikatlar</h3>
-                            ${isManagement() ? `<button onclick="showAddActivityModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2 rounded-lg font-semibold transition">+ Faaliyet Ekle</button>` : ''}
+                            ${isManagement() ? `<button onclick="showAddActivityModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2 rounded-lg font-semibold transition cursor-pointer">+ Faaliyet Ekle</button>` : ''}
                         </div>
                         <div class="space-y-3" id="activities-list"><p class="text-slate-400 text-sm">Faaliyetler yükleniyor...</p></div>
                     </div>
@@ -332,7 +332,7 @@
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="font-bold text-lg">Dernek İçi Duyurular</h3>
-                            ${isManagement() ? `<button onclick="showAddAnnouncementModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2 rounded-lg font-semibold transition">+ Duyuru Yayınla</button>` : ''}
+                            ${isManagement() ? `<button onclick="showAddAnnouncementModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2 rounded-lg font-semibold transition cursor-pointer">+ Duyuru Yayınla</button>` : ''}
                         </div>
                         <div class="space-y-3" id="announcements-list"><p class="text-slate-400 text-sm">Duyurular yükleniyor...</p></div>
                     </div>
@@ -382,8 +382,8 @@
                     </td>
                     <td class="py-3"><span class="px-2 py-1 rounded text-xs ${m.status === 'Aktif' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}">${m.status}</span></td>
                     <td class="py-3 space-x-2">
-                        ${m.status === 'Onay Bekliyor' ? `<button onclick="approveMember('${m.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-xs px-3 py-1 rounded">Onayla</button>` : ''}
-                        <button onclick="deleteMember('${m.id}')" class="text-red-400 hover:text-red-300 text-xs"><i class="fa-solid fa-trash"></i></button>
+                        ${m.status === 'Onay Bekliyor' ? `<button onclick="approveMember('${m.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-xs px-3 py-1 rounded cursor-pointer">Onayla</button>` : ''}
+                        <button onclick="deleteMember('${m.id}')" class="text-red-400 hover:text-red-300 text-xs cursor-pointer"><i class="fa-solid fa-trash"></i></button>
                     </td>
                 </tr>
             `).join('');
@@ -404,7 +404,7 @@
                     <td class="py-3">${d.period || '2026 Sezonu'}</td>
                     <td class="py-3 text-blue-400 font-mono">${d.amount || 0} ₺</td>
                     <td class="py-3"><span class="px-2 py-1 rounded text-xs ${d.status === 'Ödendi' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}">${d.status || 'Ödenmedi'}</span></td>
-                    ${isManagement() ? `<td class="py-3"><button onclick="deleteDue('${d.id}')" class="text-red-400 hover:text-red-300 text-xs"><i class="fa-solid fa-trash"></i></button></td>` : ''}
+                    ${isManagement() ? `<td class="py-3"><button onclick="deleteDue('${d.id}')" class="text-red-400 hover:text-red-300 text-xs cursor-pointer p-1"><i class="fa-solid fa-trash"></i></button></td>` : ''}
                 </tr>
             `).join('');
         }
@@ -422,7 +422,7 @@
                     <p class="text-xs text-slate-400 mt-1">Frekans: ${r.frequency}</p>
                     <p class="text-xs text-slate-400">Tone: ${r.tone || '-'}</p>
                     <p class="text-xs text-slate-400">Konum: ${r.location || '-'}</p>
-                    ${isManagement() ? `<button onclick="deleteRepeater('${r.id}')" class="absolute top-3 right-3 text-red-400 hover:text-red-300 text-xs"><i class="fa-solid fa-trash"></i></button>` : ''}
+                    ${isManagement() ? `<button onclick="deleteRepeater('${r.id}')" class="absolute top-3 right-3 text-red-400 hover:text-red-300 text-xs cursor-pointer p-1"><i class="fa-solid fa-trash"></i></button>` : ''}
                 </div>
             `).join('');
         }
@@ -443,7 +443,7 @@
                         </div>
                         <p class="text-xs text-slate-400 mt-1">${a.description || ''} • <span class="text-slate-300 font-semibold">${a.location || ''}</span></p>
                     </div>
-                    ${isManagement() ? `<button onclick="deleteActivity('${a.id}')" class="text-red-400 hover:text-red-300 text-xs"><i class="fa-solid fa-trash"></i></button>` : ''}
+                    ${isManagement() ? `<button onclick="deleteActivity('${a.id}')" class="text-red-400 hover:text-red-300 text-xs cursor-pointer p-1"><i class="fa-solid fa-trash"></i></button>` : ''}
                 </div>
             `).join('');
         }
@@ -462,7 +462,7 @@
                         <p class="text-xs text-slate-400 mt-1">${ann.content || ''}</p>
                         <p class="text-[10px] text-slate-500 mt-1">Yayınlayan: ${ann.author || 'Yönetim'}</p>
                     </div>
-                    ${isManagement() ? `<button onclick="deleteAnnouncement('${ann.id}')" class="text-red-400 hover:text-red-300 text-xs"><i class="fa-solid fa-trash"></i></button>` : ''}
+                    ${isManagement() ? `<button onclick="deleteAnnouncement('${ann.id}')" class="text-red-400 hover:text-red-300 text-xs cursor-pointer p-1"><i class="fa-solid fa-trash"></i></button>` : ''}
                 </div>
             `).join('');
         }
@@ -488,7 +488,7 @@
                         <label class="block text-xs font-medium text-slate-400 mb-1">Dönem / Sezon</label>
                         <input type="text" id="due-period" required value="2026 Sezonu" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
                     </div>
-                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition">Aidatı Kaydet</button>
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition cursor-pointer">Aidatı Kaydet</button>
                 </form>
             `);
         }
@@ -512,13 +512,13 @@
                         <label class="block text-xs font-medium text-slate-400 mb-1">Konum / Bölge</label>
                         <input type="text" id="rpt-loc" placeholder="Örn: Bursa" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
                     </div>
-                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition">Röleyi Kaydet</button>
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition cursor-pointer">Röleyi Kaydet</button>
                 </form>
             `);
         }
 
         function showAddActivityModal() {
-            openModal("Yeni Saha Faaliyet Ekle", `
+            openModal("Yeni Saha Faaliyeti Ekle", `
                 <form onsubmit="handleAddActivity(event)" class="space-y-4">
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Faaliyet Başlığı</label>
@@ -541,7 +541,7 @@
                         <label class="block text-xs font-medium text-slate-400 mb-1">Konum / Bölge</label>
                         <input type="text" id="act-loc" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
                     </div>
-                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition">Faaliyeti Kaydet</button>
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition cursor-pointer">Faaliyeti Kaydet</button>
                 </form>
             `);
         }
@@ -557,7 +557,7 @@
                         <label class="block text-xs font-medium text-slate-400 mb-1">İçerik</label>
                         <textarea id="ann-content" rows="4" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm"></textarea>
                     </div>
-                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition">Duyuruyu Yayınla</button>
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition cursor-pointer">Duyuruyu Yayınla</button>
                 </form>
             `);
         }
@@ -593,8 +593,9 @@
             const type = document.getElementById('act-type').value;
             const description = document.getElementById('act-desc').value;
             const location = document.getElementById('act-loc').value;
+            const leader = currentUser ? currentUser.full_name : 'Yönetim';
 
-            const { error } = await supabaseClient.from('field_activities').insert([{ title, type, description, location }]);
+            const { error } = await supabaseClient.from('field_activities').insert([{ title, type, description, location, leader }]);
             if (error) alert("Hata: " + error.message);
             else { closeModal(); loadActivities(); }
         }
