@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ATAK Acil Afet Haberleşme Derneği - Yönetim Paneli</title>
+    <title>ATAK Acil Afet Haberleşme Derneği - Operasyon Merkezi</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -27,7 +27,6 @@
                 <button type="button" id="tab-register-btn" onclick="switchAuth('register')" class="flex-1 pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition">Kayıt Ol</button>
             </div>
 
-            <!-- Giriş Formu -->
             <form id="login-form" onsubmit="handleUserLogin(event)" class="space-y-4">
                 <div>
                     <label class="block text-xs font-medium text-slate-400 mb-1">E-posta Adresi</label>
@@ -40,7 +39,6 @@
                 <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition">Giriş Yap</button>
             </form>
 
-            <!-- Kayıt Formu -->
             <form id="register-form" onsubmit="handleUserRegister(event)" class="space-y-4 hidden">
                 <div>
                     <label class="block text-xs font-medium text-slate-400 mb-1">Ad Soyad</label>
@@ -106,17 +104,33 @@
 
         <main class="flex-1 p-6 overflow-y-auto">
             <header class="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
-                <h1 id="page-title" class="text-xl font-bold">Genel Bakış</h1>
+                <div class="flex items-center space-x-4">
+                    <h1 id="page-title" class="text-xl font-bold">Genel Bakış</h1>
+                    <div id="emergency-banner" class="hidden bg-red-600 text-white text-xs px-3 py-1.5 rounded-full font-bold animate-pulse flex items-center space-x-1">
+                        <i class="fa-solid fa-triangle-exclamation"></i><span>KIRMIZI KOD / AFET MODU AKTİF</span>
+                    </div>
+                </div>
                 <div class="text-xs text-slate-400" id="current-user-info"></div>
             </header>
             <div id="tab-content" class="space-y-6"></div>
         </main>
     </div>
 
+    <!-- GENEL MODAL (AÇILIR PENCERE) YAPISI -->
+    <div id="universal-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-lg shadow-2xl relative">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-800">
+                <h3 id="modal-title" class="font-bold text-lg text-red-500">Form</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
     <!-- SCRIPTS -->
     <script>
         const SUPABASE_URL = "https://iywgxfemglgixjplenyw.supabase.co";
-        const SUPABASE_KEY = "sb_publishable_FNlMWgu7kmECpYbDLkC3BA_9emOSPy4";
+        const SUPABASE_KEY = "sb_publishable_FNfMMugx7kaECpYbDLkC3BA_9eeO5Py1";
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         let currentUser = null;
 
@@ -203,18 +217,43 @@
             return currentUser && ['Yönetim Kurulu Başkanı', 'Başkan Yardımcısı', 'Sayman'].includes(currentUser.role);
         }
 
+        function openModal(title, htmlContent) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-body').innerHTML = htmlContent;
+            document.getElementById('universal-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('universal-modal').classList.add('hidden');
+        }
+
+        function toggleEmergencyMode() {
+            const banner = document.getElementById('emergency-banner');
+            banner.classList.toggle('hidden');
+            const isActive = !banner.classList.contains('hidden');
+            alert(isActive ? "DİKKAT: Afet Modu / Kırmızı Kod tetiklendi! Tüm ekiplere bildirim gönderildi." : "Afet modu kapatıldı, normal operasyon düzenine geçildi.");
+        }
+
         function switchTab(tabName) {
             const content = document.getElementById('tab-content');
             const title = document.getElementById('page-title');
 
             if (tabName === 'dashboard') {
-                title.innerText = "Genel Bakış & Operasyon Paneli";
+                title.innerText = "Genel Bakış & Operasyon Merkezi";
                 content.innerHTML = `
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><p class="text-slate-400 text-xs">Aktif Üyeler</p><h3 id="stat-active" class="text-2xl font-bold mt-1 text-emerald-400">-</h3></div>
                         <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><p class="text-slate-400 text-xs">Bekleyen Başvuru</p><h3 id="stat-pending" class="text-2xl font-bold mt-1 text-amber-400">-</h3></div>
                         <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><p class="text-slate-400 text-xs">Toplam Aidat Geliri</p><h3 id="stat-dues" class="text-2xl font-bold mt-1 text-blue-400">-</h3></div>
                         <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><p class="text-slate-400 text-xs">Saha Faaliyetleri</p><h3 id="stat-activities" class="text-2xl font-bold mt-1 text-purple-400">-</h3></div>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 mt-6">
+                        <h3 class="font-bold text-lg mb-4 text-red-500"><i class="fa-solid fa-triangle-exclamation"></i> Acil Durum & Afet Komuta Konsolu</h3>
+                        <div class="flex flex-wrap gap-4">
+                            <button onclick="toggleEmergencyMode()" class="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-3 rounded-xl text-sm transition shadow-lg">Afet / Kırmızı Kod Tetikle</button>
+                            <button onclick="switchTab('activities')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-5 py-3 rounded-xl text-sm transition">Saha Görevlerini Yönet</button>
+                            <button onclick="switchTab('announcements')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-5 py-3 rounded-xl text-sm transition">Duyuru Yayınla</button>
+                        </div>
                     </div>
                 `;
                 loadDashboardStats();
@@ -242,7 +281,7 @@
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="font-bold text-lg">Aidat Durumu ve Ödemeler</h3>
-                            ${isManagement() ? `<button onclick="openAddDueModal()" class="bg-red-600 hover:bg-red-700 text-xs px-3 py-2 rounded font-semibold">+ Aidat Ekle</button>` : ''}
+                            ${isManagement() ? `<button onclick="showAddDueModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2.5 rounded-lg font-semibold transition">+ Aidat Ekle</button>` : ''}
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-sm">
@@ -263,7 +302,7 @@
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="font-bold text-lg">Afet ve Haberleşme Saha Görevleri</h3>
-                            ${isManagement() ? `<button onclick="openAddActivityModal()" class="bg-red-600 hover:bg-red-700 text-xs px-3 py-2 rounded font-semibold">+ Faaliyet Ekle</button>` : ''}
+                            ${isManagement() ? `<button onclick="showAddActivityModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2.5 rounded-lg font-semibold transition">+ Faaliyet Ekle</button>` : ''}
                         </div>
                         <div class="space-y-3" id="activities-list">
                             <p class="text-slate-400 text-sm">Faaliyetler yükleniyor...</p>
@@ -277,7 +316,7 @@
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="font-bold text-lg">Dernek İçi Duyurular</h3>
-                            ${isManagement() ? `<button onclick="openAddAnnouncementModal()" class="bg-red-600 hover:bg-red-700 text-xs px-3 py-2 rounded font-semibold">+ Duyuru Yayınla</button>` : ''}
+                            ${isManagement() ? `<button onclick="showAddAnnouncementModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2.5 rounded-lg font-semibold transition">+ Duyuru Yayınla</button>` : ''}
                         </div>
                         <div class="space-y-3" id="announcements-list">
                             <p class="text-slate-400 text-sm">Duyurular yükleniyor...</p>
@@ -290,7 +329,7 @@
                 content.innerHTML = `
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
                         <h3 class="font-bold text-lg mb-4">Dernek İstatistiksel Raporları</h3>
-                        <p class="text-slate-400 text-sm">Üye dağılımı, aidat performansları ve operasyonel özet raporları bu alanda yer almaktadır.</p>
+                        <p class="text-slate-400 text-sm">Üye dağılımı, aidat tahsilat performansları ve operasyonel özet raporları bu alanda yer almaktadır.</p>
                     </div>
                 `;
             }
@@ -395,51 +434,121 @@
             `).join('');
         }
 
-        async function openAddDueModal() {
-            const memberId = prompt("Üye ID giriniz (veya üyeler tablosundan kopyalayınız):");
-            const amount = prompt("Aidat Tutarı (₺):", "500");
-            const period = prompt("Dönem / Ay:", "Kasım 2026");
-            if (memberId && amount) {
-                await supabaseClient.from('dues').insert([{ member_id: memberId, amount: parseFloat(amount), period, status: 'Ödendi' }]);
+        // MODAL (AÇILIR PENCERE) FORMLARI
+        function showAddDueModal() {
+            openModal("Yeni Aidat Kaydı Ekle", `
+                <form onsubmit="handleAddDue(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Üye ID (Supabase Üye UUID)</label>
+                        <input type="text" id="due-member-id" required placeholder="Üye tablosundan ID kopyalayın" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Aidat Tutarı (₺)</label>
+                        <input type="number" id="due-amount" required value="500" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Dönem / Ay</label>
+                        <input type="text" id="due-period" required value="Kasım 2026" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
+                    </div>
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition">Kaydet</button>
+                </form>
+            `);
+        }
+
+        function showAddActivityModal() {
+            openModal("Yeni Saha Faaliyeti Ekle", `
+                <form onsubmit="handleAddActivity(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Faaliyet Başlığı</label>
+                        <input type="text" id="act-title" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Açıklama</label>
+                        <textarea id="act-desc" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Konum / Bölge</label>
+                        <input type="text" id="act-loc" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
+                    </div>
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition">Faaliyeti Kaydet</button>
+                </form>
+            `);
+        }
+
+        function showAddAnnouncementModal() {
+            openModal("Yeni Duyuru Yayınla", `
+                <form onsubmit="handleAddAnnouncement(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Duyuru Başlığı</label>
+                        <input type="text" id="ann-title" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">İçerik</label>
+                        <textarea id="ann-content" rows="4" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600"></textarea>
+                    </div>
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition">Duyuruyu Yayınla</button>
+                </form>
+            `);
+        }
+
+        // VERİTABANI EKLEME VE SİLME FONKSİYONLARI
+        async function handleAddDue(e) {
+            e.preventDefault();
+            const member_id = document.getElementById('due-member-id').value;
+            const amount = parseFloat(document.getElementById('due-amount').value);
+            const period = document.getElementById('due-period').value;
+
+            const { error } = await supabaseClient.from('dues').insert([{ member_id, amount, period, status: 'Ödendi' }]);
+            if (error) alert("Hata: " + error.message);
+            else {
+                closeModal();
                 loadDuesTable();
             }
         }
 
-        async function openAddActivityModal() {
-            const title = prompt("Faaliyet Başlığı:");
-            const description = prompt("Açıklama:");
-            const location = prompt("Konum:");
-            if (title) {
-                await supabaseClient.from('field_activities').insert([{ title, description, location }]);
+        async function handleAddActivity(e) {
+            e.preventDefault();
+            const title = document.getElementById('act-title').value;
+            const description = document.getElementById('act-desc').value;
+            const location = document.getElementById('act-loc').value;
+
+            const { error } = await supabaseClient.from('field_activities').insert([{ title, description, location }]);
+            if (error) alert("Hata: " + error.message);
+            else {
+                closeModal();
                 loadActivities();
             }
         }
 
-        async function openAddAnnouncementModal() {
-            const title = prompt("Duyuru Başlığı:");
-            const content = prompt("Duyuru İçeriği:");
-            if (title && content) {
-                await supabaseClient.from('announcements').insert([{ title, content }]);
+        async function handleAddAnnouncement(e) {
+            e.preventDefault();
+            const title = document.getElementById('ann-title').value;
+            const content = document.getElementById('ann-content').value;
+
+            const { error } = await supabaseClient.from('announcements').insert([{ title, content }]);
+            if (error) alert("Hata: " + error.message);
+            else {
+                closeModal();
                 loadAnnouncements();
             }
         }
 
         async function deleteDue(id) {
-            if (confirm("Silmek istediğinize emin misiniz?")) {
+            if (confirm("Bu aidat kaydını silmek istediğinize emin misiniz?")) {
                 await supabaseClient.from('dues').delete().eq('id', id);
                 loadDuesTable();
             }
         }
 
         async function deleteActivity(id) {
-            if (confirm("Silmek istediğinize emin misiniz?")) {
+            if (confirm("Bu faaliyeti silmek istediğinize emin misiniz?")) {
                 await supabaseClient.from('field_activities').delete().eq('id', id);
                 loadActivities();
             }
         }
 
         async function deleteAnnouncement(id) {
-            if (confirm("Silmek istediğinize emin misiniz?")) {
+            if (confirm("Bu duyuruyu silmek istediğinize emin misiniz?")) {
                 await supabaseClient.from('announcements').delete().eq('id', id);
                 loadAnnouncements();
             }
