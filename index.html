@@ -457,13 +457,14 @@
                     <div>
                         <h4 class="font-bold text-sm text-blue-400">${ann.title}</h4>
                         <p class="text-xs text-slate-400 mt-1">${ann.content || ''}</p>
+                        <p class="text-[10px] text-slate-500 mt-1">Yayınlayan: ${ann.author || 'Yönetim'}</p>
                     </div>
                     ${isManagement() ? `<button onclick="deleteAnnouncement('${ann.id}')" class="text-red-400 hover:text-red-300 text-xs"><i class="fa-solid fa-trash"></i></button>` : ''}
                 </div>
             `).join('');
         }
 
-        // MODAL (AÇILIR PENCERE) FORMLARI
+        // MODAL FORMLARI
         async function showAddDueModal() {
             const { data: members } = await supabaseClient.from('members').select('id, full_name');
             const options = members ? members.map(m => `<option value="${m.id}">${m.full_name}</option>`).join('') : '';
@@ -506,7 +507,7 @@
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Konum / Bölge</label>
-                        <input type="text" id="rpt-loc" placeholder="Örn: Çataldağ / Bursa" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
+                        <input type="text" id="rpt-loc" placeholder="Örn: Bursa" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
                     </div>
                     <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition">Röleyi Kaydet</button>
                 </form>
@@ -549,14 +550,15 @@
             `);
         }
 
-        // VERITABANI EKLEME VE SİLME İŞLEMLERİ
+        // VERITABANI İŞLEMLERİ
         async function handleAddDue(e) {
             e.preventDefault();
             const member_id = document.getElementById('due-member-id').value;
             const amount = parseFloat(document.getElementById('due-amount').value);
             const period = document.getElementById('due-period').value;
+            const receipt_no = "ATAK-" + Math.floor(100000 + Math.random() * 900000);
 
-            const { error } = await supabaseClient.from('dues').insert([{ member_id, amount, period, status: 'Ödendi' }]);
+            const { error } = await supabaseClient.from('dues').insert([{ member_id, amount, period, receipt_no, status: 'Ödendi' }]);
             if (error) alert("Hata: " + error.message);
             else { closeModal(); loadDuesTable(); }
         }
