@@ -492,7 +492,7 @@
                         <p class="text-xs text-slate-400 mt-1">${ann.content || ''}</p>
                         <p class="text-[10px] text-slate-500 mt-1">Yayınlayan: ${ann.author || 'Yönetim'}</p>
                     </div>
-                    ${isManagement() ? `<button onclick="deleteAnnouncement('${ann.id}')" class="text-red-400 hover:text-red-300 text-xs cursor-pointer p-1"><i class="fa-solid fa-trash"></i></button>` : ''}
+                    ${isManagement() ? `<button type="button" onclick="deleteAnnouncement('${ann.id}')" class="text-red-400 hover:text-red-300 text-xs cursor-pointer p-2"><i class="fa-solid fa-trash text-sm"></i></button>` : ''}
                 </div>
             `).join('');
         }
