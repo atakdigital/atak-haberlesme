@@ -417,7 +417,7 @@
                     <td class="py-3">${d.period || '2026 Sezonu'}</td>
                     <td class="py-3 text-blue-400 font-mono">${d.amount || 0} ₺</td>
                     <td class="py-3"><span class="px-2 py-1 rounded text-xs ${d.status === 'Ödendi' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}">${d.status || 'Ödenmedi'}</span></td>
-                    ${isManagement() ? `<td class="py-3"><button onclick="deleteDue('${d.id}')" class="text-red-400 hover:text-red-300 text-xs cursor-pointer p-1"><i class="fa-solid fa-trash"></i></button></td>` : ''}
+                    ${isManagement() ? `<td class="py-3"><button type="button" onclick="deleteDue('${d.id}')" class="text-red-400 hover:text-red-300 text-xs cursor-pointer p-2"><i class="fa-solid fa-trash text-sm"></i></button></td>` : ''}
                 </tr>
             `).join('');
         }
