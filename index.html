@@ -437,7 +437,10 @@
             container.innerHTML = acts.map(a => `
                 <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl flex justify-between items-center">
                     <div>
-                        <h4 class="font-bold text-sm text-red-400">${a.title}</h4>
+                        <div class="flex items-center space-x-2">
+                            <h4 class="font-bold text-sm text-red-400">${a.title}</h4>
+                            <span class="bg-red-500/10 text-red-400 text-[10px] px-2 py-0.5 rounded">${a.type || 'Tatbikat'}</span>
+                        </div>
                         <p class="text-xs text-slate-400 mt-1">${a.description || ''} • <span class="text-slate-300 font-semibold">${a.location || ''}</span></p>
                     </div>
                     ${isManagement() ? `<button onclick="deleteActivity('${a.id}')" class="text-red-400 hover:text-red-300 text-xs"><i class="fa-solid fa-trash"></i></button>` : ''}
@@ -515,11 +518,20 @@
         }
 
         function showAddActivityModal() {
-            openModal("Yeni Saha Faaliyeti Ekle", `
+            openModal("Yeni Saha Faaliyet Ekle", `
                 <form onsubmit="handleAddActivity(event)" class="space-y-4">
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Faaliyet Başlığı</label>
                         <input type="text" id="act-title" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Faaliyet Türü</label>
+                        <select id="act-type" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm text-slate-200">
+                            <option value="Tatbikat">Tatbikat</option>
+                            <option value="Saha Görevi">Saha Görevi</option>
+                            <option value="Röle Bakımı">Röle Bakımı</option>
+                            <option value="Eğitim">Eğitim</option>
+                        </select>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Açıklama</label>
@@ -550,7 +562,7 @@
             `);
         }
 
-        // VERITABANI İŞLEMLERİ
+        // VERİTABANI İŞLEMLERİ
         async function handleAddDue(e) {
             e.preventDefault();
             const member_id = document.getElementById('due-member-id').value;
@@ -578,10 +590,11 @@
         async function handleAddActivity(e) {
             e.preventDefault();
             const title = document.getElementById('act-title').value;
+            const type = document.getElementById('act-type').value;
             const description = document.getElementById('act-desc').value;
             const location = document.getElementById('act-loc').value;
 
-            const { error } = await supabaseClient.from('field_activities').insert([{ title, description, location }]);
+            const { error } = await supabaseClient.from('field_activities').insert([{ title, type, description, location }]);
             if (error) alert("Hata: " + error.message);
             else { closeModal(); loadActivities(); }
         }
@@ -597,33 +610,38 @@
             else { closeModal(); loadAnnouncements(); }
         }
 
-        async function deleteDue(id) {
-            if (confirm("Silmek istediğinize emin misiniz?")) {
-                await supabaseClient.from('dues').delete().eq('id', id);
-                loadDuesTable();
+        // GLOBAL SİLME FONKSİYONLARI
+        window.deleteDue = async function(id) {
+            if (confirm("Bu aidat kaydını silmek istediğinize emin misiniz?")) {
+                const { error } = await supabaseClient.from('dues').delete().eq('id', id);
+                if (error) alert("Silme Hatası: " + error.message);
+                else loadDuesTable();
             }
-        }
+        };
 
-        async function deleteRepeater(id) {
+        window.deleteRepeater = async function(id) {
             if (confirm("Bu röleyi silmek istediğinize emin misiniz?")) {
-                await supabaseClient.from('repeaters').delete().eq('id', id);
-                loadRepeaters();
+                const { error } = await supabaseClient.from('repeaters').delete().eq('id', id);
+                if (error) alert("Silme Hatası: " + error.message);
+                else loadRepeaters();
             }
-        }
+        };
 
-        async function deleteActivity(id) {
-            if (confirm("Silmek istediğinize emin misiniz?")) {
-                await supabaseClient.from('field_activities').delete().eq('id', id);
-                loadActivities();
+        window.deleteActivity = async function(id) {
+            if (confirm("Bu faaliyeti silmek istediğinize emin misiniz?")) {
+                const { error } = await supabaseClient.from('field_activities').delete().eq('id', id);
+                if (error) alert("Silme Hatası: " + error.message);
+                else loadActivities();
             }
-        }
+        };
 
-        async function deleteAnnouncement(id) {
-            if (confirm("Silmek istediğinize emin misiniz?")) {
-                await supabaseClient.from('announcements').delete().eq('id', id);
-                loadAnnouncements();
+        window.deleteAnnouncement = async function(id) {
+            if (confirm("Bu duyuruyu silmek istediğinize emin misiniz?")) {
+                const { error } = await supabaseClient.from('announcements').delete().eq('id', id);
+                if (error) alert("Silme Hatası: " + error.message);
+                else loadAnnouncements();
             }
-        }
+        };
 
         window.approveMember = async function(id) {
             await supabaseClient.from('members').update({ status: 'Aktif' }).eq('id', id);
