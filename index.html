@@ -1,735 +1,717 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ATAK Acil Afet Haberleşme Derneği - Yönetim Paneli</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        atak: {
+                            red: '#DC2626',
+                            redDark: '#991B1B',
+                            darkBg: '#0F172A',
+                            cardBg: '#1E293B',
+                            border: '#334155',
+                            gold: '#F59E0B'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Supabase Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0B0F19;
+            color: #F8FAFC;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0F172A; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        .disaster-pulse { animation: pulse-red 1.5s infinite; }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(220, 38, 38, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+        }
+    </style>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen flex flex-col">
+<body class="antialiased min-h-screen flex flex-col">
 
-    <!-- AUTH CONTAINER -->
-    <div id="auth-container" class="flex-1 flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl w-full max-w-md shadow-2xl">
-            <div class="text-center mb-8">
-                <div class="inline-flex bg-red-600/20 text-red-500 p-4 rounded-2xl mb-4">
-                    <i class="fa-solid fa-tower-broadcast text-3xl"></i>
-                </div>
-                <h1 class="text-2xl font-bold tracking-tight">ATAK Haberleşme</h1>
-                <p class="text-slate-400 text-sm mt-1">Acil Afet Derneği Yönetim ve Üye Portalı</p>
-            </div>
+    <!-- APP CONTAINER -->
+    <div id="app" class="flex-1 flex flex-col min-h-screen"></div>
 
-            <div class="flex border-b border-slate-800 mb-6">
-                <button type="button" id="tab-login-btn" onclick="switchAuth('login')" class="flex-1 pb-3 text-sm font-semibold border-b-2 border-red-600 text-red-500 transition">Giriş Yap</button>
-                <button type="button" id="tab-register-btn" onclick="switchAuth('register')" class="flex-1 pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition">Kayıt Ol</button>
-            </div>
-
-            <form id="login-form" onsubmit="handleUserLogin(event)" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1">E-posta Adresi</label>
-                    <input type="email" id="login-email" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-red-600">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1">Şifre</label>
-                    <input type="password" id="login-password" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-red-600">
-                </div>
-                <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition cursor-pointer">Giriş Yap</button>
-            </form>
-
-            <form id="register-form" onsubmit="handleUserRegister(event)" class="space-y-4 hidden">
-                <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1">Ad Soyad</label>
-                    <input type="text" id="reg-name" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1">Telsiz Çağrı Adı (Callsign)</label>
-                    <input type="text" id="reg-callsign" placeholder="Örn: TA3XYZ" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1">E-posta Adresi</label>
-                    <input type="email" id="reg-email" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1">Şifre Belirle</label>
-                    <input type="password" id="reg-password" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
-                </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 font-semibold py-2.5 rounded-lg text-sm transition cursor-pointer">Kayıt Ol ve Başvur</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- MAIN APP -->
-    <div id="app-container" class="hidden flex-1 flex flex-col lg:flex-row">
-        <!-- SIDEBAR -->
-        <aside class="w-full lg:w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
-            <div class="p-5 border-b border-slate-800 flex items-center justify-between">
-                <div>
-                    <h2 class="font-bold text-sm">ATAK Derneği</h2>
-                    <p class="text-xs text-slate-400" id="user-role-badge">Yükleniyor...</p>
-                </div>
-            </div>
-            <div class="px-4 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Modüller</div>
-            <nav class="flex-1 px-4 space-y-1">
-                <button onclick="switchTab('dashboard')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer">
-                    <i class="fa-solid fa-chart-pie w-5 text-red-500"></i><span>Genel Bakış</span>
-                </button>
-                <button id="nav-members" onclick="switchTab('members')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer">
-                    <i class="fa-solid fa-users w-5 text-slate-400"></i><span>Üye Yönetimi</span>
-                </button>
-                <button onclick="switchTab('dues')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer">
-                    <i class="fa-solid fa-wallet w-5 text-slate-400"></i><span>Aidat & Finans</span>
-                </button>
-                <button onclick="switchTab('telsiz')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer">
-                    <i class="fa-solid fa-tower-broadcast w-5 text-slate-400"></i><span>Afet & Telsiz Sahası</span>
-                </button>
-                <button onclick="switchTab('reports')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer">
-                    <i class="fa-solid fa-chart-line w-5 text-slate-400"></i><span>Raporlar</span>
-                </button>
-                <button onclick="switchTab('activities')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer">
-                    <i class="fa-solid fa-map-location-dot w-5 text-slate-400"></i><span>Saha Faaliyetleri</span>
-                </button>
-                <button onclick="switchTab('announcements')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer">
-                    <i class="fa-solid fa-bullhorn w-5 text-slate-400"></i><span>Duyurular</span>
-                </button>
-                <button onclick="switchTab('api')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer">
-                    <i class="fa-solid fa-code w-5 text-slate-400"></i><span>Mobil Uygulama & API</span>
-                </button>
-            </nav>
-            <div class="p-4 border-t border-slate-800">
-                <button onclick="handleUserLogout()" class="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 transition cursor-pointer">
-                    <i class="fa-solid fa-right-from-bracket w-5"></i><span>Oturumu Kapat</span>
-                </button>
-            </div>
-        </aside>
-
-        <!-- CONTENT AREA -->
-        <main class="flex-1 flex flex-col h-screen overflow-hidden">
-            <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-center">
-                <div class="flex items-center space-x-4">
-                    <div class="bg-red-600/20 text-red-500 p-2 rounded-xl"><i class="fa-solid fa-tower-broadcast text-lg"></i></div>
-                    <div>
-                        <h2 class="font-bold text-sm tracking-tight text-red-500">ATAK YÖNETİM PANELİ</h2>
-                        <p class="text-[11px] text-slate-400">ACİL AFET HABERLEŞME DERNEĞİ</p>
-                    </div>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <button onclick="toggleEmergencyMode()" class="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded-lg text-xs transition shadow-lg flex items-center space-x-2 animate-pulse cursor-pointer">
-                        <i class="fa-solid fa-triangle-exclamation"></i><span>AFET MODUNU TETİKLE</span>
-                    </button>
-                    <div class="text-right border-l border-slate-800 pl-4">
-                        <p class="text-xs font-semibold text-slate-200" id="topbar-name">-</p>
-                        <p class="text-[10px] text-red-400 font-medium" id="topbar-role">-</p>
-                    </div>
-                </div>
-            </header>
-
-            <div id="tab-content" class="flex-1 p-6 overflow-y-auto space-y-6"></div>
-        </main>
-    </div>
-
-    <!-- UNIVERSAL MODAL -->
-    <div id="universal-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-lg shadow-2xl relative">
-            <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-800">
-                <h3 id="modal-title" class="font-bold text-lg text-red-500">Form</h3>
-                <button onclick="closeModal()" class="text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <div id="modal-body"></div>
-        </div>
-    </div>
-
-    <!-- SCRIPTS -->
+    <!-- SCRIPT LOGIC -->
     <script>
         const SUPABASE_URL = "https://iywgxfemglgixjplenyw.supabase.co";
         const SUPABASE_KEY = "sb_publishable_FNlMWgu7kmECpYbDLkC3BA_9emOSPy4";
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        let currentUser = null;
 
-        function switchAuth(type) {
-            const loginForm = document.getElementById('login-form');
-            const registerForm = document.getElementById('register-form');
-            const loginBtn = document.getElementById('tab-login-btn');
-            const registerBtn = document.getElementById('tab-register-btn');
+        let state = {
+            currentUser: null,
+            users: [],
+            fees: [],
+            announcements: [],
+            activities: [],
+            repeaters: [],
+            reports: [],
+            disasterMode: false,
+            activeTab: 'dashboard',
+            mobileTab: 'home',
+            notification: null
+        };
 
-            if (type === 'login') {
-                loginForm.classList.remove('hidden');
-                registerForm.classList.add('hidden');
-                loginBtn.className = "flex-1 pb-3 text-sm font-semibold border-b-2 border-red-600 text-red-500 transition";
-                registerBtn.className = "flex-1 pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition";
+        function showNotification(msg, type = 'success') {
+            state.notification = { msg, type };
+            render();
+            setTimeout(() => { state.notification = null; render(); }, 3500);
+        }
+
+        async function checkSession() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
+                const { data: member } = await supabaseClient.from('members').select('*').eq('id', session.user.id).single();
+                if (member) {
+                    state.currentUser = member;
+                } else {
+                    state.currentUser = { id: session.user.id, full_name: session.user.email, role: 'Normal Üye', callsign: 'TA1XXX', blood: '0 Rh+' };
+                }
+            }
+            await fetchAllData();
+            render();
+        }
+
+        async function fetchAllData() {
+            const [mRes, dRes, aRes, rRes, repRes, repPortRes] = await Promise.all([
+                supabaseClient.from('members').select('*'),
+                supabaseClient.from('dues').select('*, members(full_name)'),
+                supabaseClient.from('announcements').select('*'),
+                supabaseClient.from('field_activities').select('*'),
+                supabaseClient.from('repeaters').select('*'),
+                supabaseClient.from('reports').select('*')
+            ]);
+
+            if (mRes.data) state.users = mRes.data;
+            if (dRes.data) state.fees = dRes.data.map(d => ({ id: d.id, memberName: d.members?.full_name || 'Üye', amount: d.amount, date: d.created_at?.split('T')[0] || '2026', method: 'Banka Havalesi' }));
+            if (aRes.data) state.announcements = aRes.data;
+            if (rRes.data) state.activities = rRes.data;
+            if (repRes.data) state.repeaters = repRes.data;
+            if (repPortRes.data) state.reports = repPortRes.data;
+        }
+
+        function toggleDisasterMode() {
+            state.disasterMode = !state.disasterMode;
+            if (state.disasterMode) {
+                showNotification('🚨 Kırmızı Alarm! Afet modu tüm sistemlerde aktifleştirildi.', 'danger');
             } else {
-                loginForm.classList.add('hidden');
-                registerForm.classList.remove('hidden');
-                registerBtn.className = "flex-1 pb-3 text-sm font-semibold border-b-2 border-blue-600 text-blue-500 transition";
-                loginBtn.className = "flex-1 pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition";
+                showNotification('Afet modu kapatıldı. Normal operasyona dönüldü.', 'info');
+            }
+            render();
+        }
+
+        function hasPermission(permission) {
+            if (!state.currentUser) return false;
+            const role = state.currentUser.role;
+            const managementRoles = ['Yönetim Kurulu Başkanı', 'Başkan Yardımcısı', 'Genel Sekreter', 'Sayman'];
+            return managementRoles.includes(role);
+        }
+
+        // --- AUTH FORMS ---
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = e.target.email.value;
+            const password = e.target.password.value;
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                showNotification("Giriş Hatası: " + error.message, 'danger');
+            } else {
+                await checkSession();
+                showNotification("Başarıyla giriş yapıldı.");
             }
         }
 
-        async function handleUserLogin(e) {
+        async function handleRegister(e) {
             e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) alert("Giriş Hatası: " + error.message);
-            else checkUserSession();
-        }
-
-        async function handleUserRegister(e) {
-            e.preventDefault();
-            const email = document.getElementById('reg-email').value;
-            const password = document.getElementById('reg-password').value;
-            const fullName = document.getElementById('reg-name').value;
-            const callsign = document.getElementById('reg-callsign').value;
+            const form = e.target;
+            const email = form.email.value;
+            const password = form.password.value;
+            const name = form.name.value;
+            const callsign = form.callsign.value.toUpperCase();
+            const blood = form.blood.value;
 
             const { data, error } = await supabaseClient.auth.signUp({
                 email, password,
-                options: { data: { full_name: fullName, callsign: callsign } }
+                options: { data: { full_name: name, callsign } }
             });
 
             if (error) {
-                alert("Kayıt Hatası: " + error.message);
+                showNotification("Kayıt Hatası: " + error.message, 'danger');
             } else {
                 if (data.user) {
                     await supabaseClient.from('members').insert([{
-                        id: data.user.id, email, full_name: fullName, callsign, role: 'Normal Üye', status: 'Onay Bekliyor'
+                        id: data.user.id, email, full_name: name, callsign, blood, role: 'Normal Üye', status: 'Onay Bekliyor'
                     }]);
                 }
-                alert("Kayıt başarılı! Yönetim Kurulu Başkanının onayını bekleyiniz.");
-                switchAuth('login');
+                showNotification('Kayıt başvurunuz alındı. Yönetim onayından sonra giriş yapabilirsiniz.', 'warning');
+                form.reset();
             }
         }
 
-        async function handleUserLogout() {
+        async function handleLogout() {
             await supabaseClient.auth.signOut();
-            document.getElementById('auth-container').classList.remove('hidden');
-            document.getElementById('app-container').classList.add('hidden');
+            state.currentUser = null;
+            render();
         }
 
-        async function checkUserSession() {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (session) {
-                document.getElementById('auth-container').classList.add('hidden');
-                document.getElementById('app-container').classList.remove('hidden');
-                const { data: member } = await supabaseClient.from('members').select('*').eq('id', session.user.id).single();
-                if (member) {
-                    currentUser = member;
-                    document.getElementById('user-role-badge').innerText = member.role;
-                    document.getElementById('topbar-name').innerText = member.full_name;
-                    document.getElementById('topbar-role').innerText = member.role;
-
-                    if (!['Yönetim Kurulu Başkanı', 'Başkan Yardımcısı', 'Sayman', 'Genel Sekreter'].includes(member.role)) {
-                        const mBtn = document.getElementById('nav-members');
-                        if (mBtn) mBtn.style.display = 'none';
-                    }
-                }
-                switchTab('dashboard');
-            }
+        // --- RENDER LAYOUTS ---
+        function renderNotification() {
+            if (!state.notification) return '';
+            const bg = state.notification.type === 'danger' ? 'bg-red-600' : state.notification.type === 'warning' ? 'bg-amber-600' : 'bg-emerald-600';
+            return `
+                <div class="fixed top-5 right-5 z-50 ${bg} text-white px-5 py-3 rounded-lg shadow-2xl flex items-center space-x-3 transition-all">
+                    <i class="fa-solid ${state.notification.type === 'danger' ? 'fa-triangle-exclamation' : 'fa-circle-check'} text-xl"></i>
+                    <span class="font-medium text-sm">${state.notification.msg}</span>
+                </div>
+            `;
         }
 
-        function isManagement() {
-            return currentUser && ['Yönetim Kurulu Başkanı', 'Başkan Yardımcısı', 'Sayman'].includes(currentUser.role);
+        function renderAuthScreen() {
+            return `
+                <div class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-red-950">
+                    <div class="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2">
+                        <div class="p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-800">
+                            <div>
+                                <div class="flex items-center space-x-3 mb-6">
+                                    <div class="w-12 h-12 bg-red-600 rounded-xl flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-red-600/30">
+                                        <i class="fa-solid fa-radio"></i>
+                                    </div>
+                                    <div>
+                                        <h1 class="font-extrabold text-xl tracking-wider text-white">ATAK DERNEĞİ</h1>
+                                        <p class="text-xs text-red-500 font-semibold tracking-widest">ACİL AFET HABERLEŞME</p>
+                                    </div>
+                                </div>
+                                <h2 class="text-lg font-bold text-slate-200 mb-4">Yönetim Paneli Girişi</h2>
+                                <form onsubmit="handleLogin(event)" class="space-y-4">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-400 mb-1">E-posta Adresi</label>
+                                        <input type="email" name="email" required placeholder="ornek@atak.org.tr" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-red-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-400 mb-1">Şifre</label>
+                                        <input type="password" name="password" required placeholder="••••••" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-red-500">
+                                    </div>
+                                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-lg text-sm transition shadow-lg shadow-red-600/30 cursor-pointer">
+                                        Giriş Yap <i class="fa-solid fa-arrow-right-to-bracket ml-2"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="p-8 bg-slate-900/50">
+                            <h2 class="text-lg font-bold text-slate-200 mb-1">Yeni Üye Kaydı</h2>
+                            <p class="text-xs text-slate-400 mb-4">Üyelik başvurunuz Yönetim Kurulu onayına sunulacaktır.</p>
+                            <form onsubmit="handleRegister(event)" class="space-y-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">Ad Soyad</label>
+                                    <input type="text" name="name" required placeholder="Ahmet Yılmaz" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-red-500">
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-400 mb-1">Callsign</label>
+                                        <input type="text" name="callsign" placeholder="TA1XXX" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-red-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-400 mb-1">Kan Grubu</label>
+                                        <select name="blood" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-red-500">
+                                            <option>A Rh+</option><option>A Rh-</option><option>B Rh+</option><option>B Rh-</option>
+                                            <option>0 Rh+</option><option>0 Rh-</option><option>AB Rh+</option><option>AB Rh-</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">E-posta</label>
+                                    <input type="email" name="email" required placeholder="ornek@mail.com" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-red-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">Şifre</label>
+                                    <input type="password" name="password" required placeholder="••••••" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-red-500">
+                                </div>
+                                <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold py-2 rounded-lg text-sm transition mt-2 cursor-pointer">
+                                    Üyelik Başvurusu Gönder
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
-        function openModal(title, htmlContent) {
+        function renderHeader() {
+            return `
+                <header class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between sticky top-0 z-40">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-9 h-9 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold shadow-md shadow-red-600/30">
+                                <i class="fa-solid fa-radio"></i>
+                            </div>
+                            <div>
+                                <h1 class="font-bold text-slate-100 tracking-wide text-base leading-tight">ATAK YÖNETİM PANELİ</h1>
+                                <p class="text-[10px] text-red-500 font-bold tracking-widest uppercase">Acil Afet Haberleşme Derneği</p>
+                            </div>
+                        </div>
+                        <button onclick="toggleDisasterMode()" class="ml-6 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-2 ${state.disasterMode ? 'bg-red-600 text-white disaster-pulse animate-bounce' : 'bg-red-950/40 text-red-400 border border-red-800 hover:bg-red-900/60'} cursor-pointer">
+                            <i class="fa-solid fa-triangle-exclamation text-sm"></i>
+                            <span>${state.disasterMode ? 'AFET MODU AKTİF (KAPAT)' : 'AFET MODUNU TETİKLE'}</span>
+                        </button>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="text-right hidden sm:block">
+                            <div class="text-sm font-semibold text-slate-200 flex items-center justify-end space-x-2">
+                                <span>${state.currentUser.full_name}</span>
+                                <span class="bg-red-950 border border-red-800 text-red-400 text-[10px] px-1.5 py-0.5 rounded font-mono">${state.currentUser.callsign || 'TA1XXX'}</span>
+                            </div>
+                            <div class="text-xs text-amber-500 font-medium">${state.currentUser.role}</div>
+                        </div>
+                        <button onclick="handleLogout()" title="Çıkış Yap" class="w-9 h-9 bg-slate-800 hover:bg-red-900/50 hover:text-red-400 border border-slate-700 rounded-lg flex items-center justify-center text-slate-300 transition cursor-pointer">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                        </button>
+                    </div>
+                </header>
+            `;
+        }
+
+        function renderSidebar() {
+            const tabs = [
+                { id: 'dashboard', label: 'Genel Bakış', icon: 'fa-chart-pie' },
+                { id: 'users', label: 'Üye Yönetimi', icon: 'fa-users' },
+                { id: 'fees', label: 'Aidat & Finans', icon: 'fa-wallet' },
+                { id: 'radio', label: 'Afet & Telsiz Sahası', icon: 'fa-tower-cell' },
+                { id: 'reports', label: 'Raporlar', icon: 'fa-chart-column' },
+                { id: 'activities', label: 'Saha Faaliyetleri', icon: 'fa-person-hiking' },
+                { id: 'announcements', label: 'Duyurular', icon: 'fa-bullhorn' },
+                { id: 'mobile', label: 'Mobil Uygulama & API', icon: 'fa-mobile-screen-button' }
+            ];
+
+            const pendingCount = state.users.filter(u => u.status === 'Onay Bekliyor').length;
+
+            return `
+                <aside class="w-full md:w-64 bg-slate-900/70 border-r border-slate-800 flex flex-col shrink-0">
+                    <div class="p-4 space-y-1 flex-1">
+                        <div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">Modüller</div>
+                        ${tabs.map(tab => `
+                            <button onclick="state.activeTab='${tab.id}'; render();" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition cursor-pointer ${state.activeTab === tab.id ? 'bg-red-600 text-white font-semibold shadow-md shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}">
+                                <div class="flex items-center space-x-3">
+                                    <i class="fa-solid ${tab.icon} w-5 text-center"></i>
+                                    <span>${tab.label}</span>
+                                </div>
+                                ${tab.id === 'users' && pendingCount > 0 ? `<span class="bg-amber-500 text-slate-950 text-[10px] font-bold px-1.5 py-0.5 rounded-full">${pendingCount}</span>` : ''}
+                            </button>
+                        `).join('')}
+                    </div>
+                </aside>
+            `;
+        }
+
+        // --- VIEWS ---
+        function renderDashboardView() {
+            const approvedUsers = state.users.filter(u => u.status === 'Aktif');
+            const totalFees = state.fees.reduce((sum, f) => sum + (f.amount || 0), 0);
+            const pendingUsers = state.users.filter(u => u.status === 'Onay Bekliyor');
+
+            return `
+                <div class="space-y-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between">
+                            <div><p class="text-xs text-slate-400">Toplam Onaylı Üye</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${approvedUsers.length}</h3><p class="text-[11px] text-emerald-400 mt-1">Aktif Telsiz Operatörleri</p></div>
+                            <div class="w-12 h-12 bg-blue-950/60 border border-blue-800 text-blue-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-users"></i></div>
+                        </div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between">
+                            <div><p class="text-xs text-slate-400">Toplam Aidat Tahsilatı</p><h3 class="text-2xl font-bold text-slate-100 mt-1">₺${totalFees.toLocaleString()}</h3><p class="text-[11px] text-slate-400 mt-1">2026 Sezonu</p></div>
+                            <div class="w-12 h-12 bg-emerald-950/60 border border-emerald-800 text-emerald-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-turkish-lira-sign"></i></div>
+                        </div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between">
+                            <div><p class="text-xs text-slate-400">Aktif Saha Faaliyetleri</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${state.activities.length}</h3><p class="text-[11px] text-amber-400 mt-1">Tatbikat & Röle Bakımı</p></div>
+                            <div class="w-12 h-12 bg-amber-950/60 border border-amber-800 text-amber-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-person-hiking"></i></div>
+                        </div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between">
+                            <div><p class="text-xs text-slate-400">Onay Bekleyen Üye</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${pendingUsers.length}</h3><p class="text-[11px] text-slate-400 mt-1">Başkan Onayı Bekleniyor</p></div>
+                            <div class="w-12 h-12 bg-purple-950/60 border border-purple-800 text-purple-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-user-clock"></i></div>
+                        </div>
+                    </div>
+
+                    ${pendingUsers.length > 0 ? `
+                        <div class="bg-amber-950/40 border border-amber-800/80 p-4 rounded-xl flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <i class="fa-solid fa-user-shield text-amber-400 text-xl"></i>
+                                <div><h4 class="font-bold text-slate-200 text-sm">Onay Bekleyen ${pendingUsers.length} Üyelik Başvurusu Var</h4><p class="text-xs text-slate-400">Yönetim yetkinizle üyeleri inceleyip onaylayabilirsiniz.</p></div>
+                            </div>
+                            <button onclick="state.activeTab='users'; render();" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-lg transition cursor-pointer">Üye Listesine Git</button>
+                        </div>
+                    ` : ''}
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl">
+                            <h4 class="font-bold text-slate-200 text-sm mb-4">Üye Kan Grubu Dağılımı</h4>
+                            <div class="h-64 flex items-center justify-center"><canvas id="chartBloodGroup"></canvas></div>
+                        </div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl">
+                            <h4 class="font-bold text-slate-200 text-sm mb-4">Aylık Aidat Tahsilat Trendi</h4>
+                            <div class="h-64 flex items-center justify-center"><canvas id="chartFeeTrend"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderUsersView() {
+            return `
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-100">Dernek Üye Yönetimi</h2>
+                            <p class="text-xs text-slate-400">Üye kayıtları, Telsiz Çağrı Kodları ve Yetki Rolleri</p>
+                        </div>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs text-slate-300">
+                                <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
+                                    <tr><th class="px-4 py-3">Ad Soyad</th><th class="px-4 py-3">Callsign</th><th class="px-4 py-3">Kan Grubu</th><th class="px-4 py-3">E-posta</th><th class="px-4 py-3">Rol</th><th class="px-4 py-3">Durum</th><th class="px-4 py-3 text-right">İşlem</th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-800">
+                                    ${state.users.map(u => `
+                                        <tr class="hover:bg-slate-800/50">
+                                            <td class="px-4 py-3 font-semibold text-slate-100">${u.full_name}</td>
+                                            <td class="px-4 py-3 text-red-400 font-mono font-bold">${u.callsign || '-'}</td>
+                                            <td class="px-4 py-3 text-red-400 font-bold">${u.blood || '0 Rh+'}</td>
+                                            <td class="px-4 py-3 text-slate-400">${u.email}</td>
+                                            <td class="px-4 py-3 text-amber-400">${u.role}</td>
+                                            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${u.status === 'Aktif' ? 'bg-emerald-950 text-emerald-400' : 'bg-amber-950 text-amber-400'}">${u.status}</span></td>
+                                            <td class="px-4 py-3 text-right space-x-2">
+                                                ${u.status === 'Onay Bekliyor' ? `<button onclick="approveMember('${u.id}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded cursor-pointer">Onayla</button>` : ''}
+                                                <button onclick="deleteMember('${u.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderFeesView() {
+            return `
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-100">Aidat & Finans Takibi</h2>
+                            <p class="text-xs text-slate-400">Üye aidat ödemeleri ve makbuz kayıtları</p>
+                        </div>
+                        <button onclick="openAddDueModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Aidat Kaydı Ekle</button>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
+                                <tr><th class="px-4 py-3">Üye Adı</th><th class="px-4 py-3">Tutar</th><th class="px-4 py-3">Sezon</th><th class="px-4 py-3 text-right">İşlem</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800">
+                                ${state.fees.map(f => `
+                                    <tr class="hover:bg-slate-800/50">
+                                        <td class="px-4 py-3 font-semibold text-slate-100">${f.memberName}</td>
+                                        <td class="px-4 py-3 text-emerald-400 font-bold">₺${f.amount}</td>
+                                        <td class="px-4 py-3 text-slate-400">${f.date}</td>
+                                        <td class="px-4 py-3 text-right"><button onclick="deleteDue('${f.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderRadioView() {
+            return `
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-100">Afet & Telsiz Sahası Durumu</h2>
+                            <p class="text-xs text-slate-400">Röle istasyonları ve aktif frekanslar</p>
+                        </div>
+                        <button onclick="openAddRepeaterModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Röle Ekle</button>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        ${state.repeaters.map(r => `
+                            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl relative">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-bold text-red-400 font-mono text-sm">${r.name}</span>
+                                    <span class="px-2 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] font-bold rounded">ONLINE</span>
+                                </div>
+                                <div class="text-xs text-slate-300">Frekans: ${r.frequency}</div>
+                                <div class="text-xs text-slate-400">Konum: ${r.location || '-'}</div>
+                                <button onclick="deleteRepeater('${r.id}')" class="absolute top-3 right-3 text-slate-500 hover:text-red-400 text-xs cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderReportsView() {
+            return `
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div><h2 class="text-lg font-bold text-slate-100">📊 Dernek Raporları & Analitik</h2><p class="text-xs text-slate-400">Operasyonel raporlar ve belgeler</p></div>
+                        <button onclick="openAddReportModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Rapor Ekle</button>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]"><tr><th class="px-4 py-3">Rapor Başlığı</th><th class="px-4 py-3">Kategori</th><th class="px-4 py-3 text-right">İşlem</th></tr></thead>
+                            <tbody class="divide-y divide-slate-800">
+                                ${state.reports.map(rep => `
+                                    <tr class="hover:bg-slate-800/50">
+                                        <td class="px-4 py-3 font-semibold text-slate-100">${rep.title}</td>
+                                        <td class="px-4 py-3 text-slate-400">${rep.category}</td>
+                                        <td class="px-4 py-3 text-right"><button onclick="deleteReport('${rep.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderActivitiesView() {
+            return `
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div><h2 class="text-lg font-bold text-slate-100">📡 Saha Faaliyetleri & Tatbikatlar</h2><p class="text-xs text-slate-400">Arama-kurtarma tatbikatları ve saha görevleri</p></div>
+                        <button onclick="openAddActivityModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Faaliyet Ekle</button>
+                    </div>
+                    <div class="space-y-3">
+                        ${state.activities.map(a => `
+                            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-center justify-between">
+                                <div><h4 class="font-bold text-slate-100 text-sm">${a.title}</h4><p class="text-xs text-slate-400 mt-1">${a.description || ''} • <span class="text-red-400">${a.location || ''}</span></p></div>
+                                <button onclick="deleteActivity('${a.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAnnouncementsView() {
+            return `
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div><h2 class="text-lg font-bold text-slate-100">📢 Duyurular & Bilgilendirmeler</h2><p class="text-xs text-slate-400">Üyelere anlık bildirim yayını</p></div>
+                        <button onclick="openAddAnnouncementModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Duyuru Ekle</button>
+                    </div>
+                    <div class="space-y-3">
+                        ${state.announcements.map(ann => `
+                            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-2 relative">
+                                <h4 class="font-bold text-slate-100 text-base">${ann.title}</h4>
+                                <p class="text-xs text-slate-300">${ann.content}</p>
+                                <button onclick="deleteAnnouncement('${ann.id}')" class="absolute top-4 right-4 text-slate-500 hover:text-red-400 text-xs cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderMobileSimulatorView() {
+            return `
+                <div class="space-y-6">
+                    <h2 class="text-lg font-bold text-slate-100">📱 Mobil Uygulama & API Entegrasyonu</h2>
+                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-4">
+                        <label class="block text-xs text-slate-400">Mobil Endpoint URL</label>
+                        <input type="text" readonly value="https://api.atak.org.tr/v1/mobile-sync" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-emerald-400">
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- MODALS ---
+        function openModal(title, html) {
             document.getElementById('modal-title').innerText = title;
-            document.getElementById('modal-body').innerHTML = htmlContent;
+            document.getElementById('modal-body').innerHTML = html;
             document.getElementById('universal-modal').classList.remove('hidden');
         }
+        function closeModal() { document.getElementById('universal-modal').classList.add('hidden'); }
 
-        function closeModal() {
-            document.getElementById('universal-modal').classList.add('hidden');
-        }
-
-        function toggleEmergencyMode() {
-            alert("DİKKAT: Afet Modu / Kırmızı Kod tetiklendi! Tüm saha ekiplerine acil durum sinyali gönderildi.");
-        }
-
-        function switchTab(tabName) {
-            const content = document.getElementById('tab-content');
-
-            if (tabName === 'dashboard') {
-                content.innerHTML = `
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><p class="text-slate-400 text-xs">Toplam Onaylı Üye</p><h3 id="stat-active" class="text-2xl font-bold mt-1 text-emerald-400">-</h3><p class="text-[10px] text-slate-500 mt-1">Aktif Telsiz Operatörleri</p></div>
-                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><p class="text-slate-400 text-xs">Toplam Aidat Tahsilatı</p><h3 id="stat-dues" class="text-2xl font-bold mt-1 text-blue-400">-</h3><p class="text-[10px] text-slate-500 mt-1">2026 Sezonu</p></div>
-                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><p class="text-slate-400 text-xs">Aktif Saha Faaliyetleri</p><h3 id="stat-activities" class="text-2xl font-bold mt-1 text-purple-400">-</h3><p class="text-[10px] text-slate-500 mt-1">Tatbikat & Röle Bakımı</p></div>
-                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><p class="text-slate-400 text-xs">Onay Bekleyen Üye</p><h3 id="stat-pending" class="text-2xl font-bold mt-1 text-amber-400">-</h3><p class="text-[10px] text-slate-500 mt-1">Başkan Onayı Bekleniyor</p></div>
-                    </div>
-                `;
-                loadDashboardStats();
-            } else if (tabName === 'members') {
-                content.innerHTML = `
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                        <h3 class="font-bold text-lg mb-4">Üye Yönetimi ve Onaylar</h3>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left text-sm">
-                                <thead class="border-b border-slate-800 text-slate-400">
-                                    <tr><th class="pb-3">Ad Soyad</th><th class="pb-3">Çağrı Adı</th><th class="pb-3">E-posta</th><th class="pb-3">Rol</th><th class="pb-3">Durum</th><th class="pb-3">İşlemler</th></tr>
-                                </thead>
-                                <tbody id="members-table-body">
-                                    <tr><td colspan="6" class="py-4 text-center text-slate-400">Yükleniyor...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                `;
-                loadMembersTable();
-            } else if (tabName === 'dues') {
-                content.innerHTML = `
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-bold text-lg">Aidat & Finans Takibi</h3>
-                            ${isManagement() ? `<button onclick="showAddDueModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2 rounded-lg font-semibold transition cursor-pointer">+ Aidat Ekle</button>` : ''}
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left text-sm">
-                                <thead class="border-b border-slate-800 text-slate-400">
-                                    <tr><th class="pb-3">Üye Adı</th><th class="pb-3">Dönem / Ay</th><th class="pb-3">Tutar</th><th class="pb-3">Durum</th>${isManagement() ? '<th class="pb-3">İşlem</th>' : ''}</tr>
-                                </thead>
-                                <tbody id="dues-table-body">
-                                    <tr><td colspan="5" class="py-4 text-center text-slate-400">Yükleniyor...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                `;
-                loadDuesTable();
-            } else if (tabName === 'telsiz') {
-                content.innerHTML = `
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-                        <div class="flex justify-between items-center">
-                            <h3 class="font-bold text-lg text-red-400"><i class="fa-solid fa-tower-broadcast"></i> Afet & Telsiz Haberleşme Frekansları</h3>
-                            ${isManagement() ? `<button onclick="showAddRepeaterModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2 rounded-lg font-semibold transition cursor-pointer">+ Röle / Frekans Ekle</button>` : ''}
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4" id="repeaters-grid">
-                            <p class="text-slate-400 text-sm">Röleler yükleniyor...</p>
-                        </div>
-                    </div>
-                `;
-                loadRepeaters();
-            } else if (tabName === 'reports') {
-                content.innerHTML = `
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-                        <div class="flex justify-between items-center">
-                            <h3 class="font-bold text-lg text-slate-100">Gelişmiş Raporlar ve Analizler</h3>
-                            ${isManagement() ? `<button onclick="showAddReportModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2 rounded-lg font-semibold transition cursor-pointer">+ Rapor / Belge Ekle</button>` : ''}
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left text-sm">
-                                <thead class="border-b border-slate-800 text-slate-400">
-                                    <tr><th class="pb-3">Rapor Adı</th><th class="pb-3">Kategori</th><th class="pb-3">Tarih</th>${isManagement() ? '<th class="pb-3">İşlem</th>' : ''}</tr>
-                                </thead>
-                                <tbody id="reports-table-body">
-                                    <tr><td colspan="4" class="py-4 text-center text-slate-400">Raporlar yükleniyor...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                `;
-                loadReportsTable();
-            } else if (tabName === 'activities') {
-                content.innerHTML = `
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-bold text-lg">Saha Faaliyetleri ve Tatbikatlar</h3>
-                            ${isManagement() ? `<button onclick="showAddActivityModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2 rounded-lg font-semibold transition cursor-pointer">+ Faaliyet Ekle</button>` : ''}
-                        </div>
-                        <div class="space-y-3" id="activities-list"><p class="text-slate-400 text-sm">Faaliyetler yükleniyor...</p></div>
-                    </div>
-                `;
-                loadActivities();
-            } else if (tabName === 'announcements') {
-                content.innerHTML = `
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-bold text-lg">Dernek İçi Duyurular</h3>
-                            ${isManagement() ? `<button onclick="showAddAnnouncementModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2 rounded-lg font-semibold transition cursor-pointer">+ Duyuru Yayınla</button>` : ''}
-                        </div>
-                        <div class="space-y-3" id="announcements-list"><p class="text-slate-400 text-sm">Duyurular yükleniyor...</p></div>
-                    </div>
-                `;
-                loadAnnouncements();
-            } else if (tabName === 'api') {
-                content.innerHTML = `
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-                        <h3 class="font-bold text-lg text-blue-400"><i class="fa-solid fa-code"></i> Mobil Uygulama & API</h3>
-                        <p class="text-slate-400 text-sm">Supabase REST uç noktaları aktif.</p>
-                    </div>
-                `;
-            }
-        }
-
-        async function loadDashboardStats() {
-            const { data: members } = await supabaseClient.from('members').select('*');
-            if (members) {
-                document.getElementById('stat-active').innerText = members.filter(m => m.status === 'Aktif').length;
-                document.getElementById('stat-pending').innerText = members.filter(m => m.status === 'Onay Bekliyor').length;
-            }
-            const { data: dues } = await supabaseClient.from('dues').select('amount');
-            const totalDues = dues ? dues.reduce((sum, d) => sum + (d.amount || 0), 0) : 0;
-            document.getElementById('stat-dues').innerText = "₺" + totalDues.toLocaleString();
-
-            const { data: acts } = await supabaseClient.from('field_activities').select('*');
-            document.getElementById('stat-activities').innerText = acts ? acts.length : 0;
-        }
-
-        async function loadMembersTable() {
-            const { data: members } = await supabaseClient.from('members').select('*');
-            const tbody = document.getElementById('members-table-body');
-            if (!members) return;
-            tbody.innerHTML = members.map(m => `
-                <tr class="border-b border-slate-800/50 hover:bg-slate-800/20">
-                    <td class="py-3 font-medium">${m.full_name}</td>
-                    <td class="py-3 text-red-400 font-mono">${m.callsign || '-'}</td>
-                    <td class="py-3 text-slate-400">${m.email}</td>
-                    <td class="py-3">
-                        <select onchange="updateMemberRole('${m.id}', this.value)" class="bg-slate-950 border border-slate-800 text-xs rounded px-2 py-1">
-                            <option ${m.role === 'Normal Üye' ? 'selected' : ''}>Normal Üye</option>
-                            <option ${m.role === 'Sayman' ? 'selected' : ''}>Sayman</option>
-                            <option ${m.role === 'Genel Sekreter' ? 'selected' : ''}>Genel Sekreter</option>
-                            <option ${m.role === 'Başkan Yardımcısı' ? 'selected' : ''}>Başkan Yardımcısı</option>
-                            <option ${m.role === 'Yönetim Kurulu Başkanı' ? 'selected' : ''}>Yönetim Kurulu Başkanı</option>
-                        </select>
-                    </td>
-                    <td class="py-3"><span class="px-2 py-1 rounded text-xs ${m.status === 'Aktif' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}">${m.status}</span></td>
-                    <td class="py-3 space-x-2">
-                        ${m.status === 'Onay Bekliyor' ? `<button onclick="approveMember('${m.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-xs px-3 py-1 rounded cursor-pointer">Onayla</button>` : ''}
-                        <button onclick="deleteMember('${m.id}')" class="text-red-400 hover:text-red-300 text-xs cursor-pointer"><i class="fa-solid fa-trash"></i></button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        async function loadDuesTable() {
-            let query = supabaseClient.from('dues').select('*, members(full_name)');
-            if (!isManagement()) query = query.eq('member_id', currentUser.id);
-            const { data: dues } = await query;
-            const tbody = document.getElementById('dues-table-body');
-            if (!dues || dues.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-400">Aidat kaydı bulunamadı.</td></tr>`;
-                return;
-            }
-            tbody.innerHTML = dues.map(d => `
-                <tr class="border-b border-slate-800/50 hover:bg-slate-800/20">
-                    <td class="py-3 font-medium">${d.members?.full_name || 'Üye'}</td>
-                    <td class="py-3">${d.period || '2026 Sezonu'}</td>
-                    <td class="py-3 text-blue-400 font-mono">${d.amount || 0} ₺</td>
-                    <td class="py-3"><span class="px-2 py-1 rounded text-xs ${d.status === 'Ödendi' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}">${d.status || 'Ödenmedi'}</span></td>
-                    ${isManagement() ? `<td class="py-3"><button type="button" onclick="deleteDue('${d.id}')" class="text-red-400 hover:text-red-300 text-xs cursor-pointer p-2"><i class="fa-solid fa-trash text-sm"></i></button></td>` : ''}
-                </tr>
-            `).join('');
-        }
-
-        async function loadRepeaters() {
-            const { data: repeaters } = await supabaseClient.from('repeaters').select('*');
-            const container = document.getElementById('repeaters-grid');
-            if (!repeaters || repeaters.length === 0) {
-                container.innerHTML = `<p class="text-slate-400 text-sm">Kayıtlı röle istasyonu bulunmuyor.</p>`;
-                return;
-            }
-            container.innerHTML = repeaters.map(r => `
-                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 relative">
-                    <h4 class="font-bold text-red-500">${r.name}</h4>
-                    <p class="text-xs text-slate-400 mt-1">Frekans: ${r.frequency}</p>
-                    <p class="text-xs text-slate-400">Tone: ${r.tone || '-'}</p>
-                    <p class="text-xs text-slate-400">Konum: ${r.location || '-'}</p>
-                    ${isManagement() ? `<button onclick="deleteRepeater('${r.id}')" class="absolute top-3 right-3 text-red-400 hover:text-red-300 text-xs cursor-pointer p-1"><i class="fa-solid fa-trash"></i></button>` : ''}
-                </div>
-            `).join('');
-        }
-
-        async function loadReportsTable() {
-            const { data: reports } = await supabaseClient.from('reports').select('*');
-            const tbody = document.getElementById('reports-table-body');
-            if (!reports || reports.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-slate-400">Kayıtlı rapor bulunmuyor.</td></tr>`;
-                return;
-            }
-            tbody.innerHTML = reports.map(r => `
-                <tr class="border-b border-slate-800/50 hover:bg-slate-800/20">
-                    <td class="py-3 font-medium text-slate-200">${r.title}</td>
-                    <td class="py-3 text-slate-400">${r.category || 'Genel'}</td>
-                    <td class="py-3 text-slate-400">${new Date(r.created_at).toLocaleDateString('tr-TR')}</td>
-                    ${isManagement() ? `<td class="py-3"><button onclick="deleteReport('${r.id}')" class="text-red-400 hover:text-red-300 text-xs cursor-pointer p-1"><i class="fa-solid fa-trash"></i></button></td>` : ''}
-                </tr>
-            `).join('');
-        }
-
-        async function loadActivities() {
-            const { data: acts } = await supabaseClient.from('field_activities').select('*');
-            const container = document.getElementById('activities-list');
-            if (!acts || acts.length === 0) {
-                container.innerHTML = `<p class="text-slate-400 text-sm">Kayıtlı saha faaliyeti bulunmuyor.</p>`;
-                return;
-            }
-            container.innerHTML = acts.map(a => `
-                <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl flex justify-between items-center">
-                    <div>
-                        <div class="flex items-center space-x-2">
-                            <h4 class="font-bold text-sm text-red-400">${a.title}</h4>
-                            <span class="bg-red-500/10 text-red-400 text-[10px] px-2 py-0.5 rounded">${a.type || 'Tatbikat'}</span>
-                        </div>
-                        <p class="text-xs text-slate-400 mt-1">${a.description || ''} • <span class="text-slate-300 font-semibold">${a.location || ''}</span></p>
-                    </div>
-                    ${isManagement() ? `<button onclick="deleteActivity('${a.id}')" class="text-red-400 hover:text-red-300 text-xs cursor-pointer p-1"><i class="fa-solid fa-trash"></i></button>` : ''}
-                </div>
-            `).join('');
-        }
-
-        async function loadAnnouncements() {
-            const { data: anns } = await supabaseClient.from('announcements').select('*');
-            const container = document.getElementById('announcements-list');
-            if (!anns || anns.length === 0) {
-                container.innerHTML = `<p class="text-slate-400 text-sm">Aktif duyuru bulunmuyor.</p>`;
-                return;
-            }
-            container.innerHTML = anns.map(ann => `
-                <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl flex justify-between items-center">
-                    <div>
-                        <h4 class="font-bold text-sm text-blue-400">${ann.title}</h4>
-                        <p class="text-xs text-slate-400 mt-1">${ann.content || ''}</p>
-                        <p class="text-[10px] text-slate-500 mt-1">Yayınlayan: ${ann.author || 'Yönetim'}</p>
-                    </div>
-                    ${isManagement() ? `<button type="button" onclick="deleteAnnouncement('${ann.id}')" class="text-red-400 hover:text-red-300 text-xs cursor-pointer p-2"><i class="fa-solid fa-trash text-sm"></i></button>` : ''}
-                </div>
-            `).join('');
-        }
-
-        // MODAL FORMLARI
-        async function showAddDueModal() {
+        async function openAddDueModal() {
             const { data: members } = await supabaseClient.from('members').select('id, full_name');
-            const options = members ? members.map(m => `<option value="${m.id}">${m.full_name}</option>`).join('') : '';
-
+            const opts = members ? members.map(m => `<option value="${m.id}">${m.full_name}</option>`).join('') : '';
             openModal("Yeni Aidat Kaydı Ekle", `
-                <form onsubmit="handleAddDue(event)" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Üye Seçin</label>
-                        <select id="due-member-id" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm text-slate-200">
-                            ${options}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Aidat Tutarı (₺)</label>
-                        <input type="number" id="due-amount" required value="500" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Dönem / Sezon</label>
-                        <input type="text" id="due-period" required value="2026 Sezonu" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
-                    </div>
-                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition cursor-pointer">Aidatı Kaydet</button>
+                <form onsubmit="handleAddDue(event)" class="space-y-3">
+                    <select id="due-member" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">${opts}</select>
+                    <input type="number" id="due-amount" required value="500" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100" placeholder="Tutar">
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button>
                 </form>
             `);
         }
-
-        function showAddRepeaterModal() {
-            openModal("Yeni Röle İstasyonu Ekle", `
-                <form onsubmit="handleAddRepeater(event)" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Röle Adı</label>
-                        <input type="text" id="rpt-name" required placeholder="Örn: Marmara Röle (RPT-1)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Frekans</label>
-                        <input type="text" id="rpt-freq" required placeholder="Örn: 145.750 MHz" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Tone (CTCSS)</label>
-                        <input type="text" id="rpt-tone" placeholder="Örn: 88.5 Hz" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Konum / Bölge</label>
-                        <input type="text" id="rpt-loc" placeholder="Örn: Bursa" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
-                    </div>
-                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition cursor-pointer">Röleyi Kaydet</button>
-                </form>
-            `);
-        }
-
-        function showAddReportModal() {
-            openModal("Yeni Rapor / Belge Ekle", `
-                <form onsubmit="handleAddReport(event)" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Rapor Başlığı</label>
-                        <input type="text" id="rep-title" required placeholder="Örn: 2026 1. Dönem Faaliyet Raporu" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Kategori</label>
-                        <select id="rep-cat" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm text-slate-200">
-                            <option value="Mali Rapor">Mali Rapor</option>
-                            <option value="Operasyonel Rapor">Operasyonel Rapor</option>
-                            <option value="Tatbikat Sonucu">Tatbikat Sonucu</option>
-                            <option value="Genel Kurul">Genel Kurul</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition cursor-pointer">Raporu Kaydet</button>
-                </form>
-            `);
-        }
-
-        function showAddActivityModal() {
-            openModal("Yeni Saha Faaliyeti Ekle", `
-                <form onsubmit="handleAddActivity(event)" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Faaliyet Başlığı</label>
-                        <input type="text" id="act-title" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Faaliyet Türü</label>
-                        <select id="act-type" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm text-slate-200">
-                            <option value="Tatbikat">Tatbikat</option>
-                            <option value="Saha Görevi">Saha Görevi</option>
-                            <option value="Röle Bakımı">Röle Bakımı</option>
-                            <option value="Eğitim">Eğitim</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Açıklama</label>
-                        <textarea id="act-desc" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm"></textarea>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Konum / Bölge</label>
-                        <input type="text" id="act-loc" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
-                    </div>
-                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition cursor-pointer">Faaliyeti Kaydet</button>
-                </form>
-            `);
-        }
-
-        function showAddAnnouncementModal() {
-            openModal("Yeni Duyuru Yayınla", `
-                <form onsubmit="handleAddAnnouncement(event)" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Duyuru Başlığı</label>
-                        <input type="text" id="ann-title" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">İçerik</label>
-                        <textarea id="ann-content" rows="4" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm"></textarea>
-                    </div>
-                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition cursor-pointer">Duyuruyu Yayınla</button>
-                </form>
-            `);
-        }
-
-        // VERİTABANI İŞLEMLERİ
         async function handleAddDue(e) {
             e.preventDefault();
-            const member_id = document.getElementById('due-member-id').value;
+            const member_id = document.getElementById('due-member').value;
             const amount = parseFloat(document.getElementById('due-amount').value);
-            const period = document.getElementById('due-period').value;
-            const receipt_no = "ATAK-" + Math.floor(100000 + Math.random() * 900000);
-
-            const { error } = await supabaseClient.from('dues').insert([{ member_id, amount, period, receipt_no, status: 'Ödendi' }]);
-            if (error) alert("Hata: " + error.message);
-            else { closeModal(); loadDuesTable(); }
+            await supabaseClient.from('dues').insert([{ member_id, amount, status: 'Ödendi' }]);
+            closeModal(); await fetchAllData(); render();
         }
 
+        function openAddRepeaterModal() {
+            openModal("Röle Ekle", `
+                <form onsubmit="handleAddRepeater(event)" class="space-y-3">
+                    <input type="text" id="rpt-name" required placeholder="Röle Adı" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
+                    <input type="text" id="rpt-freq" required placeholder="Frekans" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
+                    <input type="text" id="rpt-loc" placeholder="Konum" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button>
+                </form>
+            `);
+        }
         async function handleAddRepeater(e) {
             e.preventDefault();
-            const name = document.getElementById('rpt-name').value;
-            const frequency = document.getElementById('rpt-freq').value;
-            const tone = document.getElementById('rpt-tone').value;
-            const location = document.getElementById('rpt-loc').value;
-
-            const { error } = await supabaseClient.from('repeaters').insert([{ name, frequency, tone, location }]);
-            if (error) alert("Hata: " + error.message);
-            else { closeModal(); loadRepeaters(); }
+            await supabaseClient.from('repeaters').insert([{ name: document.getElementById('rpt-name').value, frequency: document.getElementById('rpt-freq').value, location: document.getElementById('rpt-loc').value }]);
+            closeModal(); await fetchAllData(); render();
         }
 
+        function openAddReportModal() {
+            openModal("Röle / Rapor Ekle", `
+                <form onsubmit="handleAddReport(event)" class="space-y-3">
+                    <input type="text" id="rep-title" required placeholder="Röle Adı / Başlık" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
+                    <input type="text" id="rep-cat" required placeholder="Kategori" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button>
+                </form>
+            `);
+        }
         async function handleAddReport(e) {
             e.preventDefault();
-            const title = document.getElementById('rep-title').value;
-            const category = document.getElementById('rep-cat').value;
-
-            const { error } = await supabaseClient.from('reports').insert([{ title, category }]);
-            if (error) alert("Hata: " + error.message);
-            else { closeModal(); loadReportsTable(); }
+            await supabaseClient.from('reports').insert([{ title: document.getElementById('rep-title').value, category: document.getElementById('rep-cat').value }]);
+            closeModal(); await fetchAllData(); render();
         }
 
+        function openAddActivityModal() {
+            openModal("Saha Faaliyeti Ekle", `
+                <form onsubmit="handleAddActivity(event)" class="space-y-3">
+                    <input type="text" id="act-title" required placeholder="Başlık" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
+                    <input type="text" id="act-loc" required placeholder="Konum" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
+                    <button type="submit" class="w-full bg-amber-600 hover:bg-amber-500 text-slate-950 py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button>
+                </form>
+            `);
+        }
         async function handleAddActivity(e) {
             e.preventDefault();
-            const title = document.getElementById('act-title').value;
-            const type = document.getElementById('act-type').value;
-            const description = document.getElementById('act-desc').value;
-            const location = document.getElementById('act-loc').value;
-            const leader = currentUser ? currentUser.full_name : 'Yönetim';
-
-            const { error } = await supabaseClient.from('field_activities').insert([{ title, type, description, location, leader }]);
-            if (error) alert("Hata: " + error.message);
-            else { closeModal(); loadActivities(); }
+            await supabaseClient.from('field_activities').insert([{ title: document.getElementById('act-title').value, location: document.getElementById('act-loc').value }]);
+            closeModal(); await fetchAllData(); render();
         }
 
+        function openAddAnnouncementModal() {
+            openModal("Duyuru Ekle", `
+                <form onsubmit="handleAddAnnouncement(event)" class="space-y-3">
+                    <input type="text" id="ann-title" required placeholder="Başlık" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
+                    <textarea id="ann-content" required placeholder="İçerik" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></textarea>
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Yayınla</button>
+                </form>
+            `);
+        }
         async function handleAddAnnouncement(e) {
             e.preventDefault();
-            const title = document.getElementById('ann-title').value;
-            const content = document.getElementById('ann-content').value;
-            const author = currentUser ? currentUser.full_name : 'Yönetim';
-
-            const { error } = await supabaseClient.from('announcements').insert([{ title, content, author }]);
-            if (error) alert("Hata: " + error.message);
-            else { closeModal(); loadAnnouncements(); }
+            await supabaseClient.from('announcements').insert([{ title: document.getElementById('ann-title').value, content: document.getElementById('ann-content').value }]);
+            closeModal(); await fetchAllData(); render();
         }
 
-        // GLOBAL SİLME FONKSİYONLARI
-        window.deleteDue = async function(id) {
-            if (confirm("Bu aidat kaydını silmek istediğinize emin misiniz?")) {
-                const { error } = await supabaseClient.from('dues').delete().eq('id', id);
-                if (error) alert("Silme Hatası: " + error.message);
-                else loadDuesTable();
+        // --- DELETIONS & APPROVALS ---
+        window.approveMember = async (id) => { await supabaseClient.from('members').update({ status: 'Aktif' }).eq('id', id); await fetchAllData(); render(); };
+        window.deleteMember = async (id) => { if(confirm("Silmek istediğinize emin misiniz?")) { await supabaseClient.from('members').delete().eq('id', id); await fetchAllData(); render(); } };
+        window.deleteDue = async (id) => { await supabaseClient.from('dues').delete().eq('id', id); await fetchAllData(); render(); };
+        window.deleteRepeater = async (id) => { await supabaseClient.from('repeaters').delete().eq('id', id); await fetchAllData(); render(); };
+        window.deleteReport = async (id) => { await supabaseClient.from('reports').delete().eq('id', id); await fetchAllData(); render(); };
+        window.deleteActivity = async (id) => { await supabaseClient.from('field_activities').delete().eq('id', id); await fetchAllData(); render(); };
+        window.deleteAnnouncement = async (id) => { await supabaseClient.from('announcements').delete().eq('id', id); await fetchAllData(); render(); };
+
+        // --- RENDER ROUTER ---
+        function render() {
+            const root = document.getElementById('app');
+            if (!state.currentUser) {
+                root.innerHTML = renderAuthScreen() + renderNotification();
+                return;
             }
-        };
 
-        window.deleteRepeater = async function(id) {
-            if (confirm("Bu röleyi silmek istediğinize emin misiniz?")) {
-                const { error } = await supabaseClient.from('repeaters').delete().eq('id', id);
-                if (error) alert("Silme Hatası: " + error.message);
-                else loadRepeaters();
+            let content = '';
+            switch(state.activeTab) {
+                case 'dashboard': content = renderDashboardView(); break;
+                case 'users': content = renderUsersView(); break;
+                case 'fees': content = renderFeesView(); break;
+                case 'radio': content = renderRadioView(); break;
+                case 'reports': content = renderReportsView(); break;
+                case 'activities': content = renderActivitiesView(); break;
+                case 'announcements': content = renderAnnouncementsView(); break;
+                case 'mobile': content = renderMobileSimulatorView(); break;
+                default: content = renderDashboardView();
             }
-        };
 
-        window.deleteReport = async function(id) {
-            if (confirm("Bu raporu silmek istediğinize emin misiniz?")) {
-                const { error } = await supabaseClient.from('reports').delete().eq('id', id);
-                if (error) alert("Silme Hatası: " + error.message);
-                else loadReportsTable();
+            root.innerHTML = `
+                ${renderHeader()}
+                <div class="flex-1 flex flex-col md:flex-row">
+                    ${renderSidebar()}
+                    <main class="flex-1 p-6 overflow-y-auto">${content}</main>
+                </div>
+                ${renderNotification()}
+                <div id="universal-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+                    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-lg shadow-2xl relative">
+                        <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-800">
+                            <h3 id="modal-title" class="font-bold text-lg text-red-500">Form</h3>
+                            <button onclick="closeModal()" class="text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-xmark text-lg"></i></button>
+                        </div>
+                        <div id="modal-body"></div>
+                    </div>
+                </div>
+            `;
+
+            setTimeout(initCharts, 50);
+        }
+
+        function initCharts() {
+            if (state.activeTab === 'dashboard') {
+                const ctxBlood = document.getElementById('chartBloodGroup');
+                if (ctxBlood) {
+                    const counts = {};
+                    state.users.forEach(u => { const b = u.blood || '0 Rh+'; counts[b] = (counts[b] || 0) + 1; });
+                    new Chart(ctxBlood, {
+                        type: 'doughnut',
+                        data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#DC2626', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#6366F1'] }] },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94A3B8' } } } }
+                    });
+                }
+                const ctxFee = document.getElementById('chartFeeTrend');
+                if (ctxFee) {
+                    new Chart(ctxFee, {
+                        type: 'bar',
+                        data: { labels: ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran'], datasets: [{ label: 'Tahsilat (₺)', data: [1500, 2000, 1800, 2500, 3100, 2800], backgroundColor: '#10B981' }] },
+                        options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { color: '#94A3B8' } }, y: { ticks: { color: '#94A3B8' } } }, plugins: { legend: { labels: { color: '#94A3B8' } } } }
+                    });
+                }
             }
-        };
+        }
 
-        window.deleteActivity = async function(id) {
-            if (confirm("Bu faaliyeti silmek istediğinize emin misiniz?")) {
-                const { error } = await supabaseClient.from('field_activities').delete().eq('id', id);
-                if (error) alert("Silme Hatası: " + error.message);
-                else loadActivities();
-            }
-        };
-
-        window.deleteAnnouncement = async function(id) {
-            if (confirm("Bu duyuruyu silmek istediğinize emin misiniz?")) {
-                const { error } = await supabaseClient.from('announcements').delete().eq('id', id);
-                if (error) alert("Silme Hatası: " + error.message);
-                else loadAnnouncements();
-            }
-        };
-
-        window.approveMember = async function(id) {
-            await supabaseClient.from('members').update({ status: 'Aktif' }).eq('id', id);
-            loadMembersTable();
-        };
-
-        window.updateMemberRole = async function(id, role) {
-            await supabaseClient.from('members').update({ role: role }).eq('id', id);
-        };
-
-        window.deleteMember = async function(id) {
-            if (confirm("Bu üyeyi silmek istediğinize emin misiniz?")) {
-                await supabaseClient.from('members').delete().eq('id', id);
-                loadMembersTable();
-            }
-        };
-
-        window.onload = checkUserSession;
+        window.onload = checkSession;
     </script>
 </body>
 </html>
