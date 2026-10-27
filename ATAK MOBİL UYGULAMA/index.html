@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATAK Acil Afet Haberleşme Derneği - Yönetim Paneli</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- SUPABASE CONFIGURATION -->
+    <script>
+        const SUPABASE_URL = "https://iywgxfemglgixjplenyw.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_FNlMWgu7kmECpYbDLkC3BA_9emOSPy4";
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    </script>
+
+    <!-- AUTH & MAIN CONTAINER -->
+    <div id="auth-container" class="flex-1 flex items-center justify-center p-4">
+        <!-- Giriş / Kayıt Formu -->
+        <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl w-full max-w-md shadow-2xl">
+            <div class="text-center mb-8">
+                <div class="inline-flex bg-red-600/20 text-red-500 p-4 rounded-2xl mb-4">
+                    <i class="fa-solid fa-tower-broadcast text-3xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold tracking-tight">ATAK Haberleşme</h1>
+                <p class="text-slate-400 text-sm mt-1">Acil Afet Derneği Yönetim ve Üye Portalı</p>
+            </div>
+
+            <!-- Tab Seçimi -->
+            <div class="flex border-b border-slate-800 mb-6">
+                <button id="tab-login-btn" onclick="switchAuthTab('login')" class="flex-1 pb-3 text-sm font-semibold border-b-2 border-red-600 text-red-500 transition">Giriş Yap</button>
+                <button id="tab-register-btn" onclick="switchAuthTab('register')" class="flex-1 pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition">Kayıt Ol</button>
+            </div>
+
+            <!-- Giriş Formu -->
+            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">E-posta Adresi</label>
+                    <input type="email" id="login-email" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-red-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Şifre</label>
+                    <input type="password" id="login-password" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-red-600">
+                </div>
+                <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition">Giriş Yap</button>
+            </form>
+
+            <!-- Kayıt Formu -->
+            <form id="register-form" onsubmit="handleRegister(event)" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Ad Soyad</label>
+                    <input type="text" id="reg-name" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Telsiz Çağrı Adı (Callsign)</label>
+                    <input type="text" id="reg-callsign" placeholder="Örn: TA3XYZ" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">E-posta Adresi</label>
+                    <input type="email" id="reg-email" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Şifre Belirle</label>
+                    <input type="password" id="reg-password" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 font-semibold py-2.5 rounded-lg text-sm transition">Kayıt Ol ve Başvur</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN APP DASHBOARD (Gizli Başlar) -->
+    <div id="app-container" class="hidden flex-1 flex flex-col lg:flex-row">
+        <!-- Sidebar -->
+        <aside class="w-full lg:w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
+            <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-red-600 p-2 rounded-lg text-white">
+                        <i class="fa-solid fa-tower-broadcast"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-bold text-sm">ATAK Derneği</h2>
+                        <p class="text-xs text-slate-400" id="user-role-badge">Yükleniyor...</p>
+                    </div>
+                </div>
+            </div>
+            <nav class="flex-1 p-4 space-y-1">
+                <button onclick="switchTab('dashboard')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium bg-red-600 text-white nav-btn">
+                    <i class="fa-solid fa-chart-pie w-5"></i><span>Genel Bakış</span>
+                </button>
+                <button onclick="switchTab('members')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 nav-btn">
+                    <i class="fa-solid fa-users w-5"></i><span>Üye Yönetimi</span>
+                </button>
+                <button onclick="switchTab('dues')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 nav-btn">
+                    <i class="fa-solid fa-wallet w-5"></i><span>Aidat Takibi</span>
+                </button>
+                <button onclick="switchTab('activities')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 nav-btn">
+                    <i class="fa-solid fa-map-location-dot w-5"></i><span>Saha Faaliyetleri</span>
+                </button>
+                <button onclick="switchTab('announcements')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 nav-btn">
+                    <i class="fa-solid fa-bullhorn w-5"></i><span>Duyurular</span>
+                </button>
+                <button onclick="switchTab('reports')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 nav-btn">
+                    <i class="fa-solid fa-chart-line w-5"></i><span>Raporlar</span>
+                </button>
+            </nav>
+            <div class="p-4 border-t border-slate-800">
+                <button onclick="handleLogout()" class="w-full flex items-center space-x-3 px-4 py-2 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 transition">
+                    <i class="fa-solid fa-right-from-bracket w-5"></i><span>Oturumu Kapat</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- İçerik Alanı -->
+        <main class="flex-1 p-6 overflow-y-auto">
+            <header class="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
+                <h1 id="page-title" class="text-xl font-bold">Genel Bakış & Operasyon Paneli</h1>
+                <div class="text-xs text-slate-400" id="current-user-info"></div>
+            </header>
+            
+            <!-- Dinamik Sekmeler İçeriği Buraya Yüklenecek -->
+            <div id="tab-content" class="space-y-6">
+                <!-- İçerikler JS ile doldurulur -->
+            </div>
+        </main>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        function switchAuthTab(tab) {
+            const loginForm = document.getElementById('login-form');
+            const registerForm = document.getElementById('register-form');
+            const loginBtn = document.getElementById('tab-login-btn');
+            const registerBtn = document.getElementById('tab-register-btn');
+
+            if (tab === 'login') {
+                loginForm.classList.remove('hidden');
+                registerForm.classList.add('hidden');
+                loginBtn.className = "flex-1 pb-3 text-sm font-semibold border-b-2 border-red-600 text-red-500 transition";
+                registerBtn.className = "flex-1 pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition";
+            } else {
+                loginForm.classList.add('hidden');
+                registerForm.classList.remove('hidden');
+                registerBtn.className = "flex-1 pb-3 text-sm font-semibold border-b-2 border-blue-600 text-blue-500 transition";
+                loginBtn.className = "flex-1 pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition";
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                alert("Giriş Hatası: " + error.message);
+            } else {
+                checkUserSession();
+            }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            const fullName = document.getElementById('reg-name').value;
+            const callsign = document.getElementById('reg-callsign').value;
+
+            const { data, error } = await supabaseClient.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: { full_name: fullName, callsign: callsign }
+                }
+            });
+
+            if (error) {
+                alert("Kayıt Hatası: " + error.message);
+            } else {
+                // members tablosuna ekleme
+                if (data.user) {
+                    await supabaseClient.from('members').insert([{
+                        id: data.user.id,
+                        email: email,
+                        full_name: fullName,
+                        callsign: callsign,
+                        role: 'Normal Üye',
+                        status: 'Onay Bekliyor'
+                    }]);
+                }
+                alert("Kayıt başarılı! Yönetim Kurulu Başkanının onaylamasını bekleyiniz.");
+                switchAuthTab('login');
+            }
+        }
+
+        async function handleLogout() {
+            await supabaseClient.auth.signOut();
+            document.getElementById('auth-container').classList.remove('hidden');
+            document.getElementById('app-container').classList.add('hidden');
+        }
+
+        async function checkUserSession() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
+                document.getElementById('auth-container').classList.add('hidden');
+                document.getElementById('app-container').classList.remove('hidden');
+                
+                // Üye yetkilerini çek
+                const { data: member } = await supabaseClient.from('members').select('*').eq('id', session.user.id).single();
+                if (member) {
+                    document.getElementById('user-role-badge').innerText = member.role;
+                    document.getElementById('current-user-info').innerText = `${member.full_name} (${member.callsign || 'Rol Yok'})`;
+                }
+                switchTab('dashboard');
+            }
+        }
+
+        function switchTab(tabName) {
+            const content = document.getElementById('tab-content');
+            const title = document.getElementById('page-title');
+
+            if (tabName === 'dashboard') {
+                title.innerText = "Genel Bakış & Operasyon Paneli";
+                content.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><p class="text-slate-400 text-xs">Aktif Üyeler</p><h3 class="text-2xl font-bold mt-1 text-emerald-400">24</h3></div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><p class="text-slate-400 text-xs">Bekleyen Başvuru</p><h3 class="text-2xl font-bold mt-1 text-amber-400">5</h3></div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><p class="text-slate-400 text-xs">Aylık Aidat Toplamı</p><h3 class="text-2xl font-bold mt-1 text-blue-400">12.450 ₺</h3></div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><p class="text-slate-400 text-xs">Saha Ekipmanları</p><h3 class="text-2xl font-bold mt-1 text-purple-400">18 Röle</h3></div>
+                    </div>
+                `;
+            } else if (tabName === 'members') {
+                title.innerText = "Üye Yönetimi ve Onaylar";
+                content.innerHTML = `<div class="bg-slate-900 border border-slate-800 p-6 rounded-xl"><p class="text-slate-400">Üye listesi ve onay ekranları yakında yüklenecek...</p></div>`;
+            } else if (tabName === 'dues') {
+                title.innerText = "Aidat Takip Sistemi";
+                content.innerHTML = `<div class="bg-slate-900 border border-slate-800 p-6 rounded-xl"><p class="text-slate-400">Aidat tahsilat modülü aktif.</p></div>`;
+            } else if (tabName === 'activities') {
+                title.innerText = "Saha Faaliyetleri ve Tatbikatlar";
+                content.innerHTML = `<div class="bg-slate-900 border border-slate-800 p-6 rounded-xl"><p class="text-slate-400">Saha operasyonları listesi.</p></div>`;
+            } else if (tabName === 'announcements') {
+                title.innerText = "Duyurular ve Bildirimler";
+                content.innerHTML = `<div class="bg-slate-900 border border-slate-800 p-6 rounded-xl"><p class="text-slate-400">Dernek duyuru panosu.</p></div>`;
+            } else if (tabName === 'reports') {
+                title.innerText = "Gelişmiş Raporlar ve Analizler";
+                content.innerHTML = `<div class="bg-slate-900 border border-slate-800 p-6 rounded-xl"><p class="text-slate-400">Finansal ve operasyonel raporlama ekranı.</p></div>`;
+            }
+        }
+
+        window.onload = checkUserSession;
+    </script>
+</body>
+</html>
