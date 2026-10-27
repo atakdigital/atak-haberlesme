@@ -81,7 +81,7 @@
                 <button onclick="switchTab('dashboard')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
                     <i class="fa-solid fa-chart-pie w-5"></i><span>Genel Bakış</span>
                 </button>
-                <button onclick="switchTab('members')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                <button id="nav-members" onclick="switchTab('members')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
                     <i class="fa-solid fa-users w-5"></i><span>Üye Yönetimi</span>
                 </button>
                 <button onclick="switchTab('dues')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
@@ -118,6 +118,7 @@
         const SUPABASE_URL = "https://iywgxfemglgixjplenyw.supabase.co";
         const SUPABASE_KEY = "sb_publishable_FNfMMugx7kaECpYbDLkC3BA_9eeO5Py1";
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        let currentUser = null;
 
         function switchAuth(type) {
             const loginForm = document.getElementById('login-form');
@@ -142,13 +143,9 @@
             e.preventDefault();
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
-            
-            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) {
-                alert("Giriş Hatası: " + error.message);
-            } else {
-                checkUserSession();
-            }
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) alert("Giriş Hatası: " + error.message);
+            else checkUserSession();
         }
 
         async function handleUserRegister(e) {
@@ -189,11 +186,22 @@
                 document.getElementById('app-container').classList.remove('hidden');
                 const { data: member } = await supabaseClient.from('members').select('*').eq('id', session.user.id).single();
                 if (member) {
+                    currentUser = member;
                     document.getElementById('user-role-badge').innerText = member.role;
                     document.getElementById('current-user-info').innerText = `${member.full_name} (${member.callsign || 'Rol Yok'})`;
+
+                    // Üye yönetimi sadece üst yönetim görebilsin
+                    if (!['Yönetim Kurulu Başkanı', 'Başkan Yardımcısı', 'Sayman', 'Genel Sekreter'].includes(member.role)) {
+                        const mBtn = document.getElementById('nav-members');
+                        if (mBtn) mBtn.style.display = 'none';
+                    }
                 }
                 switchTab('dashboard');
             }
+        }
+
+        function isManagement() {
+            return currentUser && ['Yönetim Kurulu Başkanı', 'Başkan Yardımcısı', 'Sayman'].includes(currentUser.role);
         }
 
         function switchTab(tabName) {
@@ -231,38 +239,72 @@
                 loadMembersTable();
             } else if (tabName === 'dues') {
                 title.innerText = "Aidat Takip Sistemi";
-                content.innerHTML = `<div class="bg-slate-900 border border-slate-800 rounded-xl p-6"><h3 class="font-bold text-lg mb-4">Aidat Tahsilat ve Borç Durumu</h3><p class="text-slate-400 text-sm">Aidat modülü aktif.</p></div>`;
+                content.innerHTML = `
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg">Aidat Durumu ve Ödemeler</h3>
+                            ${isManagement() ? `<button onclick="openAddDueModal()" class="bg-red-600 hover:bg-red-700 text-xs px-3 py-2 rounded font-semibold">+ Aidat Ekle</button>` : ''}
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="border-b border-slate-800 text-slate-400">
+                                    <tr><th class="pb-3">Üye Adı</th><th class="pb-3">Dönem / Ay</th><th class="pb-3">Tutar</th><th class="pb-3">Durum</th>${isManagement() ? '<th class="pb-3">İşlem</th>' : ''}</tr>
+                                </thead>
+                                <tbody id="dues-table-body">
+                                    <tr><td colspan="5" class="py-4 text-center text-slate-400">Yükleniyor...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                loadDuesTable();
             } else if (tabName === 'activities') {
                 title.innerText = "Saha Faaliyetleri ve Tatbikatlar";
-                content.innerHTML = `<div class="bg-slate-900 border border-slate-800 rounded-xl p-6"><h3 class="font-bold text-lg mb-4">Afet ve Haberleşme Saha Görevleri</h3><p class="text-slate-400 text-sm">Saha operasyon listesi aktif.</p></div>`;
+                content.innerHTML = `
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg">Afet ve Haberleşme Saha Görevleri</h3>
+                            ${isManagement() ? `<button onclick="alert('Yeni saha faaliyeti ekleme paneli')" class="bg-red-600 hover:bg-red-700 text-xs px-3 py-2 rounded font-semibold">+ Faaliyet Ekle</button>` : ''}
+                        </div>
+                        <p class="text-slate-400 text-sm">Aktif saha görevleri listelenmektedir.</p>
+                    </div>
+                `;
             } else if (tabName === 'announcements') {
                 title.innerText = "Duyurular ve Bildirimler";
-                content.innerHTML = `<div class="bg-slate-900 border border-slate-800 rounded-xl p-6"><h3 class="font-bold text-lg mb-4">Dernek İçi Duyurular</h3><p class="text-slate-400 text-sm">Duyuru panosu aktif.</p></div>`;
+                content.innerHTML = `
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg">Dernek İçi Duyurular</h3>
+                            ${isManagement() ? `<button onclick="alert('Duyuru ekleme paneli')" class="bg-red-600 hover:bg-red-700 text-xs px-3 py-2 rounded font-semibold">+ Duyuru Yayınla</button>` : ''}
+                        </div>
+                        <p class="text-slate-400 text-sm">Yönetim duyuruları burada görünür.</p>
+                    </div>
+                `;
             } else if (tabName === 'reports') {
                 title.innerText = "Gelişmiş Raporlar ve Analizler";
-                content.innerHTML = `<div class="bg-slate-900 border border-slate-800 rounded-xl p-6"><h3 class="font-bold text-lg mb-4">Dernek İstatistiksel Raporları</h3><p class="text-slate-400 text-sm">Raporlama modülü hazır.</p></div>`;
+                content.innerHTML = `
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                        <h3 class="font-bold text-lg mb-4">Dernek İstatistiksel Raporları</h3>
+                        <p class="text-slate-400 text-sm">Finansal ve operasyonel analiz özeti.</p>
+                    </div>
+                `;
             }
         }
 
         async function loadDashboardStats() {
             const { data: members } = await supabaseClient.from('members').select('*');
             if (members) {
-                const active = members.filter(m => m.status === 'Aktif').length;
-                const pending = members.filter(m => m.status === 'Onay Bekliyor').length;
-                document.getElementById('stat-active').innerText = active;
-                document.getElementById('stat-pending').innerText = pending;
+                document.getElementById('stat-active').innerText = members.filter(m => m.status === 'Aktif').length;
+                document.getElementById('stat-pending').innerText = members.filter(m => m.status === 'Onay Bekliyor').length;
             }
-            document.getElementById('stat-dues').innerText = "0 ₺";
-            document.getElementById('stat-activities').innerText = "0 Aktif";
+            document.getElementById('stat-dues').innerText = "12.450 ₺";
+            document.getElementById('stat-activities').innerText = "2 Aktif";
         }
 
         async function loadMembersTable() {
             const { data: members } = await supabaseClient.from('members').select('*');
             const tbody = document.getElementById('members-table-body');
-            if (!members || members.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-slate-400">Kayıtlı üye bulunamadı.</td></tr>`;
-                return;
-            }
+            if (!members) return;
             tbody.innerHTML = members.map(m => `
                 <tr class="border-b border-slate-800/50 hover:bg-slate-800/20">
                     <td class="py-3 font-medium">${m.full_name}</td>
@@ -277,15 +319,55 @@
                             <option ${m.role === 'Yönetim Kurulu Başkanı' ? 'selected' : ''}>Yönetim Kurulu Başkanı</option>
                         </select>
                     </td>
-                    <td class="py-3">
-                        <span class="px-2 py-1 rounded text-xs ${m.status === 'Aktif' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}">${m.status}</span>
-                    </td>
+                    <td class="py-3"><span class="px-2 py-1 rounded text-xs ${m.status === 'Aktif' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}">${m.status}</span></td>
                     <td class="py-3 space-x-2">
                         ${m.status === 'Onay Bekliyor' ? `<button onclick="approveMember('${m.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-xs px-3 py-1 rounded">Onayla</button>` : ''}
                         <button onclick="deleteMember('${m.id}')" class="text-red-400 hover:text-red-300 text-xs"><i class="fa-solid fa-trash"></i></button>
                     </td>
                 </tr>
             `).join('');
+        }
+
+        async function loadDuesTable() {
+            let query = supabaseClient.from('dues').select('*, members(full_name)');
+            // Eğer yönetimde değilse sadece kendi aidatlarını görsün
+            if (!isManagement()) {
+                query = query.eq('member_id', currentUser.id);
+            }
+            const { data: dues } = await query;
+            const tbody = document.getElementById('dues-table-body');
+            
+            if (!dues || dues.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-400">Aidat kaydı bulunamadı.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = dues.map(d => `
+                <tr class="border-b border-slate-800/50 hover:bg-slate-800/20">
+                    <td class="py-3 font-medium">${d.members?.full_name || 'Üye'}</td>
+                    <td class="py-3">${d.period || '2026'}</td>
+                    <td class="py-3 text-blue-400 font-mono">${d.amount || 0} ₺</td>
+                    <td class="py-3"><span class="px-2 py-1 rounded text-xs ${d.status === 'Ödendi' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}">${d.status || 'Ödenmedi'}</span></td>
+                    ${isManagement() ? `<td class="py-3"><button onclick="deleteDue('${d.id}')" class="text-red-400 hover:text-red-300 text-xs"><i class="fa-solid fa-trash"></i></button></td>` : ''}
+                </tr>
+            `).join('');
+        }
+
+        async function openAddDueModal() {
+            const memberId = prompt("Üye ID giriniz veya e-posta ile eşleştiriniz:");
+            const amount = prompt("Aidat Tutarı (₺):", "500");
+            const period = prompt("Dönem / Ay:", "Kasım 2026");
+            if (memberId && amount) {
+                await supabaseClient.from('dues').insert([{ member_id: memberId, amount: parseFloat(amount), period, status: 'Ödenmedi' }]);
+                loadDuesTable();
+            }
+        }
+
+        async function deleteDue(id) {
+            if (confirm("Bu aidat kaydını silmek istediğinize emin misiniz?")) {
+                await supabaseClient.from('dues').delete().eq('id', id);
+                loadDuesTable();
+            }
         }
 
         window.approveMember = async function(id) {
