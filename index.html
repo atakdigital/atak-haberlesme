@@ -34,11 +34,7 @@
     <!-- Google Fonts: Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0B0F19;
-            color: #F8FAFC;
-        }
+        body { font-family: 'Inter', sans-serif; background-color: #0B0F19; color: #F8FAFC; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #0F172A; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
@@ -52,10 +48,8 @@
 </head>
 <body class="antialiased min-h-screen flex flex-col">
 
-    <!-- APP CONTAINER -->
     <div id="app" class="flex-1 flex flex-col min-h-screen"></div>
 
-    <!-- SCRIPT LOGIC -->
     <script>
         const SUPABASE_URL = "https://iywgxfemglgixjplenyw.supabase.co";
         const SUPABASE_KEY = "sb_publishable_FNlMWgu7kmECpYbDLkC3BA_9emOSPy4";
@@ -71,7 +65,6 @@
             reports: [],
             disasterMode: false,
             activeTab: 'dashboard',
-            mobileTab: 'home',
             notification: null
         };
 
@@ -88,7 +81,7 @@
                 if (member) {
                     state.currentUser = member;
                 } else {
-                    state.currentUser = { id: session.user.id, full_name: session.user.email, role: 'Normal Üye', callsign: 'TA1XXX', blood: '0 Rh+', phone: '' };
+                    state.currentUser = { id: session.user.id, full_name: session.user.email, role: 'Normal Üye', callsign: 'TA1XXX' };
                 }
             }
             await fetchAllData();
@@ -115,26 +108,17 @@
 
         function toggleDisasterMode() {
             state.disasterMode = !state.disasterMode;
-            if (state.disasterMode) {
-                showNotification('🚨 Kırmızı Alarm! Afet modu tüm sistemlerde aktifleştirildi.', 'danger');
-            } else {
-                showNotification('Afet modu kapatıldı. Normal operasyona dönüldü.', 'info');
-            }
+            showNotification(state.disasterMode ? '🚨 Afet modu aktifleştirildi.' : 'Afet modu kapatıldı.', state.disasterMode ? 'danger' : 'info');
             render();
         }
 
-        // --- AUTH FORMS ---
         async function handleLogin(e) {
             e.preventDefault();
             const email = e.target.email.value;
             const password = e.target.password.value;
             const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) {
-                showNotification("Giriş Hatası: " + error.message, 'danger');
-            } else {
-                await checkSession();
-                showNotification("Başarıyla giriş yapıldı.");
-            }
+            if (error) showNotification("Giriş Hatası: " + error.message, 'danger');
+            else { await checkSession(); showNotification("Başarıyla giriş yapıldı."); }
         }
 
         async function handleRegister(e) {
@@ -144,23 +128,20 @@
             const password = form.password.value;
             const name = form.name.value;
             const callsign = form.callsign.value.toUpperCase();
-            const blood = form.blood.value;
-            const phone = form.phone.value;
 
             const { data, error } = await supabaseClient.auth.signUp({
                 email, password,
-                options: { data: { full_name: name, callsign, phone } }
+                options: { data: { full_name: name, callsign } }
             });
 
-            if (error) {
-                showNotification("Kayıt Hatası: " + error.message, 'danger');
-            } else {
+            if (error) showNotification("Kayıt Hatası: " + error.message, 'danger');
+            else {
                 if (data.user) {
                     await supabaseClient.from('members').insert([{
-                        id: data.user.id, email, full_name: name, callsign, blood, phone, role: 'Normal Üye', status: 'Onay Bekliyor'
+                        id: data.user.id, email, full_name: name, callsign, role: 'Normal Üye', status: 'Onay Bekliyor'
                     }]);
                 }
-                showNotification('Kayıt başvurunuz alındı. Yönetim onayından sonra giriş yapabilirsiniz.', 'warning');
+                showNotification('Kayıt başvurunuz alındı.', 'warning');
                 form.reset();
             }
         }
@@ -171,12 +152,11 @@
             render();
         }
 
-        // --- RENDER LAYOUTS ---
         function renderNotification() {
             if (!state.notification) return '';
             const bg = state.notification.type === 'danger' ? 'bg-red-600' : state.notification.type === 'warning' ? 'bg-amber-600' : 'bg-emerald-600';
             return `
-                <div class="fixed top-5 right-5 z-50 ${bg} text-white px-5 py-3 rounded-lg shadow-2xl flex items-center space-x-3 transition-all">
+                <div class="fixed top-5 right-5 z-50 ${bg} text-white px-5 py-3 rounded-lg shadow-2xl flex items-center space-x-3">
                     <i class="fa-solid ${state.notification.type === 'danger' ? 'fa-triangle-exclamation' : 'fa-circle-check'} text-xl"></i>
                     <span class="font-medium text-sm">${state.notification.msg}</span>
                 </div>
@@ -190,67 +170,25 @@
                         <div class="p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-800">
                             <div>
                                 <div class="flex items-center space-x-3 mb-6">
-                                    <div class="w-12 h-12 bg-red-600 rounded-xl flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-red-600/30">
-                                        <i class="fa-solid fa-radio"></i>
-                                    </div>
-                                    <div>
-                                        <h1 class="font-extrabold text-xl tracking-wider text-white">ATAK DERNEĞİ</h1>
-                                        <p class="text-xs text-red-500 font-semibold tracking-widest">ACİL AFET HABERLEŞME</p>
-                                    </div>
+                                    <div class="w-12 h-12 bg-red-600 rounded-xl flex items-center justify-center text-white text-2xl font-black shadow-lg"><i class="fa-solid fa-radio"></i></div>
+                                    <div><h1 class="font-extrabold text-xl tracking-wider text-white">ATAK DERNEĞİ</h1><p class="text-xs text-red-500 font-semibold">ACİL AFET HABERLEŞME</p></div>
                                 </div>
                                 <h2 class="text-lg font-bold text-slate-200 mb-4">Yönetim Paneli Girişi</h2>
                                 <form onsubmit="handleLogin(event)" class="space-y-4">
-                                    <div>
-                                        <label class="block text-xs font-medium text-slate-400 mb-1">E-posta Adresi</label>
-                                        <input type="email" name="email" required placeholder="ornek@atak.org.tr" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-red-500">
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs font-medium text-slate-400 mb-1">Şifre</label>
-                                        <input type="password" name="password" required placeholder="••••••" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-red-500">
-                                    </div>
-                                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-lg text-sm transition shadow-lg shadow-red-600/30 cursor-pointer">
-                                        Giriş Yap <i class="fa-solid fa-arrow-right-to-bracket ml-2"></i>
-                                    </button>
+                                    <div><label class="block text-xs font-medium text-slate-400 mb-1">E-posta</label><input type="email" name="email" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"></div>
+                                    <div><label class="block text-xs font-medium text-slate-400 mb-1">Şifre</label><input type="password" name="password" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"></div>
+                                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-lg text-sm cursor-pointer">Giriş Yap</button>
                                 </form>
                             </div>
                         </div>
-
                         <div class="p-8 bg-slate-900/50">
                             <h2 class="text-lg font-bold text-slate-200 mb-1">Yeni Üye Kaydı</h2>
-                            <p class="text-xs text-slate-400 mb-4">Üyelik başvurunuz Yönetim Kurulu onayına sunulacaktır.</p>
-                            <form onsubmit="handleRegister(event)" class="space-y-3">
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-400 mb-1">Ad Soyad</label>
-                                    <input type="text" name="name" required placeholder="Ahmet Yılmaz" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-red-500">
-                                </div>
-                                <div class="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label class="block text-xs font-medium text-slate-400 mb-1">Callsign</label>
-                                        <input type="text" name="callsign" placeholder="TA1XXX" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-red-500">
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs font-medium text-slate-400 mb-1">Kan Grubu</label>
-                                        <select name="blood" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-red-500">
-                                            <option>A Rh+</option><option>A Rh-</option><option>B Rh+</option><option>B Rh-</option>
-                                            <option>0 Rh+</option><option>0 Rh-</option><option>AB Rh+</option><option>AB Rh-</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-400 mb-1">Telefon Numarası</label>
-                                    <input type="tel" name="phone" placeholder="05XX XXX XX XX" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-red-500">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-400 mb-1">E-posta</label>
-                                    <input type="email" name="email" required placeholder="ornek@mail.com" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-red-500">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-400 mb-1">Şifre</label>
-                                    <input type="password" name="password" required placeholder="••••••" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-red-500">
-                                </div>
-                                <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold py-2 rounded-lg text-sm transition mt-2 cursor-pointer">
-                                    Üyelik Başvurusu Gönder
-                                </button>
+                            <form onsubmit="handleRegister(event)" class="space-y-3 mt-4">
+                                <div><label class="block text-xs font-medium text-slate-400 mb-1">Ad Soyad</label><input type="text" name="name" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100"></div>
+                                <div><label class="block text-xs font-medium text-slate-400 mb-1">Callsign</label><input type="text" name="callsign" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100"></div>
+                                <div><label class="block text-xs font-medium text-slate-400 mb-1">E-posta</label><input type="email" name="email" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100"></div>
+                                <div><label class="block text-xs font-medium text-slate-400 mb-1">Şifre</label><input type="password" name="password" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100"></div>
+                                <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold py-2 rounded-lg text-sm cursor-pointer mt-2">Kayıt Ol</button>
                             </form>
                         </div>
                     </div>
@@ -263,30 +201,19 @@
                 <header class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between sticky top-0 z-40">
                     <div class="flex items-center space-x-4">
                         <div class="flex items-center space-x-3">
-                            <div class="w-9 h-9 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold shadow-md shadow-red-600/30">
-                                <i class="fa-solid fa-radio"></i>
-                            </div>
-                            <div>
-                                <h1 class="font-bold text-slate-100 tracking-wide text-base leading-tight">ATAK YÖNETİM PANELİ</h1>
-                                <p class="text-[10px] text-red-500 font-bold tracking-widest uppercase">Acil Afet Haberleşme Derneği</p>
-                            </div>
+                            <div class="w-9 h-9 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold"><i class="fa-solid fa-radio"></i></div>
+                            <div><h1 class="font-bold text-slate-100 text-base">ATAK YÖNETİM PANELİ</h1><p class="text-[10px] text-red-500 font-bold uppercase">Acil Afet Haberleşme Derneği</p></div>
                         </div>
-                        <button onclick="toggleDisasterMode()" class="ml-6 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-2 ${state.disasterMode ? 'bg-red-600 text-white disaster-pulse animate-bounce' : 'bg-red-950/40 text-red-400 border border-red-800 hover:bg-red-900/60'} cursor-pointer">
-                            <i class="fa-solid fa-triangle-exclamation text-sm"></i>
-                            <span>${state.disasterMode ? 'AFET MODU AKTİF (KAPAT)' : 'AFET MODUNU TETİKLE'}</span>
+                        <button onclick="toggleDisasterMode()" class="ml-6 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-2 ${state.disasterMode ? 'bg-red-600 text-white disaster-pulse animate-bounce' : 'bg-red-950/40 text-red-400 border border-red-800'} cursor-pointer">
+                            <i class="fa-solid fa-triangle-exclamation"></i><span>${state.disasterMode ? 'AFET MODU AKTİF' : 'AFET MODUNU TETİKLE'}</span>
                         </button>
                     </div>
                     <div class="flex items-center space-x-4">
                         <div class="text-right hidden sm:block">
-                            <div class="text-sm font-semibold text-slate-200 flex items-center justify-end space-x-2">
-                                <span>${state.currentUser.full_name}</span>
-                                <span class="bg-red-950 border border-red-800 text-red-400 text-[10px] px-1.5 py-0.5 rounded font-mono">${state.currentUser.callsign || 'TA1XXX'}</span>
-                            </div>
-                            <div class="text-xs text-amber-500 font-medium">${state.currentUser.role}</div>
+                            <div class="text-sm font-semibold text-slate-200"><span>${state.currentUser.full_name}</span> <span class="bg-red-950 border border-red-800 text-red-400 text-[10px] px-1.5 py-0.5 rounded font-mono">${state.currentUser.callsign || 'TA1XXX'}</span></div>
+                            <div class="text-xs text-amber-500">${state.currentUser.role}</div>
                         </div>
-                        <button onclick="handleLogout()" title="Çıkış Yap" class="w-9 h-9 bg-slate-800 hover:bg-red-900/50 hover:text-red-400 border border-slate-700 rounded-lg flex items-center justify-center text-slate-300 transition cursor-pointer">
-                            <i class="fa-solid fa-right-from-bracket"></i>
-                        </button>
+                        <button onclick="handleLogout()" class="w-9 h-9 bg-slate-800 hover:bg-red-900/50 border border-slate-700 rounded-lg flex items-center justify-center text-slate-300 cursor-pointer"><i class="fa-solid fa-right-from-bracket"></i></button>
                     </div>
                 </header>
             `;
@@ -303,20 +230,13 @@
                 { id: 'announcements', label: 'Duyurular', icon: 'fa-bullhorn' },
                 { id: 'mobile', label: 'Mobil Uygulama & API', icon: 'fa-mobile-screen-button' }
             ];
-
-            const pendingCount = state.users.filter(u => u.status === 'Onay Bekliyor').length;
-
             return `
                 <aside class="w-full md:w-64 bg-slate-900/70 border-r border-slate-800 flex flex-col shrink-0">
                     <div class="p-4 space-y-1 flex-1">
-                        <div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">Modüller</div>
+                        <div class="text-[11px] font-bold text-slate-500 uppercase px-3 mb-2">Modüller</div>
                         ${tabs.map(tab => `
-                            <button onclick="state.activeTab='${tab.id}'; render();" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition cursor-pointer ${state.activeTab === tab.id ? 'bg-red-600 text-white font-semibold shadow-md shadow-red-600/20' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}">
-                                <div class="flex items-center space-x-3">
-                                    <i class="fa-solid ${tab.icon} w-5 text-center"></i>
-                                    <span>${tab.label}</span>
-                                </div>
-                                ${tab.id === 'users' && pendingCount > 0 ? `<span class="bg-amber-500 text-slate-950 text-[10px] font-bold px-1.5 py-0.5 rounded-full">${pendingCount}</span>` : ''}
+                            <button onclick="state.activeTab='${tab.id}'; render();" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition cursor-pointer ${state.activeTab === tab.id ? 'bg-red-600 text-white font-semibold' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}">
+                                <i class="fa-solid ${tab.icon} w-5 text-center"></i><span>${tab.label}</span>
                             </button>
                         `).join('')}
                     </div>
@@ -324,7 +244,6 @@
             `;
         }
 
-        // --- VIEWS ---
         function renderDashboardView() {
             const approvedUsers = state.users.filter(u => u.status === 'Aktif');
             const totalFees = state.fees.reduce((sum, f) => sum + (f.amount || 0), 0);
@@ -333,43 +252,14 @@
             return `
                 <div class="space-y-6">
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between">
-                            <div><p class="text-xs text-slate-400">Toplam Onaylı Üye</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${approvedUsers.length}</h3><p class="text-[11px] text-emerald-400 mt-1">Aktif Telsiz Operatörleri</p></div>
-                            <div class="w-12 h-12 bg-blue-950/60 border border-blue-800 text-blue-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-users"></i></div>
-                        </div>
-                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between">
-                            <div><p class="text-xs text-slate-400">Toplam Aidat Tahsilatı</p><h3 class="text-2xl font-bold text-slate-100 mt-1">₺${totalFees.toLocaleString()}</h3><p class="text-[11px] text-slate-400 mt-1">2026 Sezonu</p></div>
-                            <div class="w-12 h-12 bg-emerald-950/60 border border-emerald-800 text-emerald-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-turkish-lira-sign"></i></div>
-                        </div>
-                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between">
-                            <div><p class="text-xs text-slate-400">Aktif Saha Faaliyetleri</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${state.activities.length}</h3><p class="text-[11px] text-amber-400 mt-1">Tatbikat & Röle Bakımı</p></div>
-                            <div class="w-12 h-12 bg-amber-950/60 border border-amber-800 text-amber-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-person-hiking"></i></div>
-                        </div>
-                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between">
-                            <div><p class="text-xs text-slate-400">Onay Bekleyen Üye</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${pendingUsers.length}</h3><p class="text-[11px] text-slate-400 mt-1">Başkan Onayı Bekleniyor</p></div>
-                            <div class="w-12 h-12 bg-purple-950/60 border border-purple-800 text-purple-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-user-clock"></i></div>
-                        </div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Toplam Onaylı Üye</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${approvedUsers.length}</h3></div><div class="w-12 h-12 bg-blue-950/60 border border-blue-800 text-blue-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-users"></i></div></div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Toplam Aidat Tahsilatı</p><h3 class="text-2xl font-bold text-slate-100 mt-1">₺${totalFees.toLocaleString()}</h3></div><div class="w-12 h-12 bg-emerald-950/60 border border-emerald-800 text-emerald-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-turkish-lira-sign"></i></div></div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Aktif Saha Faaliyetleri</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${state.activities.length}</h3></div><div class="w-12 h-12 bg-amber-950/60 border border-amber-800 text-amber-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-person-hiking"></i></div></div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Onay Bekleyen Üye</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${pendingUsers.length}</h3></div><div class="w-12 h-12 bg-purple-950/60 border border-purple-800 text-purple-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-user-clock"></i></div></div>
                     </div>
-
-                    ${pendingUsers.length > 0 ? `
-                        <div class="bg-amber-950/40 border border-amber-800/80 p-4 rounded-xl flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
-                                <i class="fa-solid fa-user-shield text-amber-400 text-xl"></i>
-                                <div><h4 class="font-bold text-slate-200 text-sm">Onay Bekleyen ${pendingUsers.length} Üyelik Başvurusu Var</h4><p class="text-xs text-slate-400">Yönetim yetkinizle üyeleri inceleyip onaylayabilirsiniz.</p></div>
-                            </div>
-                            <button onclick="state.activeTab='users'; render();" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-lg transition cursor-pointer">Üye Listesine Git</button>
-                        </div>
-                    ` : ''}
-
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl">
-                            <h4 class="font-bold text-slate-200 text-sm mb-4">Üye Kan Grubu Dağılımı</h4>
-                            <div class="h-64 flex items-center justify-center"><canvas id="chartBloodGroup"></canvas></div>
-                        </div>
-                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl">
-                            <h4 class="font-bold text-slate-200 text-sm mb-4">Aylık Aidat Tahsilat Trendi</h4>
-                            <div class="h-64 flex items-center justify-center"><canvas id="chartFeeTrend"></canvas></div>
-                        </div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><h4 class="font-bold text-slate-200 text-sm mb-4">Üye Kan Grubu Dağılımı</h4><div class="h-64 flex items-center justify-center"><canvas id="chartBloodGroup"></canvas></div></div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><h4 class="font-bold text-slate-200 text-sm mb-4">Aylık Aidat Tahsilat Trendi</h4><div class="h-64 flex items-center justify-center"><canvas id="chartFeeTrend"></canvas></div></div>
                     </div>
                 </div>
             `;
@@ -378,12 +268,7 @@
         function renderUsersView() {
             return `
                 <div class="space-y-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 class="text-lg font-bold text-slate-100">Dernek Üye Yönetimi</h2>
-                            <p class="text-xs text-slate-400">Üye kayıtları, Telsiz Çağrı Kodları ve Yetki Rolleri</p>
-                        </div>
-                    </div>
+                    <div class="flex items-center justify-between"><div><h2 class="text-lg font-bold text-slate-100">Dernek Üye Yönetimi</h2><p class="text-xs text-slate-400">Üye kayıtları ve yetki rolleri</p></div></div>
                     <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-xs text-slate-300">
@@ -418,25 +303,12 @@
         function renderFeesView() {
             return `
                 <div class="space-y-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 class="text-lg font-bold text-slate-100">Aidat & Finans Takibi</h2>
-                            <p class="text-xs text-slate-400">Üye aidat ödemeleri ve makbuz kayıtları</p>
-                        </div>
-                        <button onclick="openAddDueModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Aidat Kaydı Ekle</button>
-                    </div>
+                    <div class="flex items-center justify-between"><div><h2 class="text-lg font-bold text-slate-100">Aidat & Finans Takibi</h2></div><button onclick="openAddDueModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Aidat Ekle</button></div>
                     <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
                         <table class="w-full text-left text-xs text-slate-300">
                             <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]"><tr><th class="px-4 py-3">Üye Adı</th><th class="px-4 py-3">Tutar</th><th class="px-4 py-3">Sezon</th><th class="px-4 py-3 text-right">İşlem</th></tr></thead>
                             <tbody class="divide-y divide-slate-800">
-                                ${state.fees.map(f => `
-                                    <tr class="hover:bg-slate-800/50">
-                                        <td class="px-4 py-3 font-semibold text-slate-100">${f.memberName}</td>
-                                        <td class="px-4 py-3 text-emerald-400 font-bold">₺${f.amount}</td>
-                                        <td class="px-4 py-3 text-slate-400">${f.date}</td>
-                                        <td class="px-4 py-3 text-right"><button onclick="deleteDue('${f.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></td>
-                                    </tr>
-                                `).join('')}
+                                ${state.fees.map(f => `<tr class="hover:bg-slate-800/50"><td class="px-4 py-3 font-semibold text-slate-100">${f.memberName}</td><td class="px-4 py-3 text-emerald-400 font-bold">₺${f.amount}</td><td class="px-4 py-3 text-slate-400">${f.date}</td><td class="px-4 py-3 text-right"><button onclick="deleteDue('${f.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></td></tr>`).join('')}
                             </tbody>
                         </table>
                     </div>
@@ -447,22 +319,12 @@
         function renderRadioView() {
             return `
                 <div class="space-y-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 class="text-lg font-bold text-slate-100">Afet & Telsiz Sahası Durumu</h2>
-                            <p class="text-xs text-slate-400">Röle istasyonları ve aktif frekanslar</p>
-                        </div>
-                        <button onclick="openAddRepeaterModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Röle Ekle</button>
-                    </div>
+                    <div class="flex items-center justify-between"><div><h2 class="text-lg font-bold text-slate-100">Afet & Telsiz Sahası Durumu</h2></div><button onclick="openAddRepeaterModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Röle Ekle</button></div>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         ${state.repeaters.map(r => `
                             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl relative">
-                                <div class="flex items-center justify-between mb-2">
-                                    <span class="font-bold text-red-400 font-mono text-sm">${r.name}</span>
-                                    <span class="px-2 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] font-bold rounded">ONLINE</span>
-                                </div>
-                                <div class="text-xs text-slate-300">Frekans: ${r.frequency}</div>
-                                <div class="text-xs text-slate-400">Konum: ${r.location || '-'}</div>
+                                <div class="flex items-center justify-between mb-2"><span class="font-bold text-red-400 font-mono text-sm">${r.name}</span><span class="px-2 py-0.5 bg-emerald-950 text-emerald-400 text-[10px] font-bold rounded">ONLINE</span></div>
+                                <div class="text-xs text-slate-300">Frekans: ${r.frequency}</div><div class="text-xs text-slate-400">Konum: ${r.location || '-'}</div>
                                 <button onclick="deleteRepeater('${r.id}')" class="absolute top-3 right-3 text-slate-500 hover:text-red-400 text-xs cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>
                             </div>
                         `).join('')}
@@ -475,22 +337,20 @@
             return `
                 <div class="space-y-6">
                     <div class="flex items-center justify-between">
-                        <div><h2 class="text-lg font-bold text-slate-100">📊 Dernek Raporları & Analitik</h2><p class="text-xs text-slate-400">Operasyonel raporlar ve belgeler</p></div>
+                        <div><h2 class="text-lg font-bold text-slate-100">📊 Dernek Raporları & Analitik</h2><p class="text-xs text-slate-400">Operasyonel raporlar ve detaylı açıklamalar</p></div>
                         <button onclick="openAddReportModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Rapor Ekle</button>
                     </div>
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
-                        <table class="w-full text-left text-xs text-slate-300">
-                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]"><tr><th class="px-4 py-3">Rapor Başlığı</th><th class="px-4 py-3">Kategori</th><th class="px-4 py-3 text-right">İşlem</th></tr></thead>
-                            <tbody class="divide-y divide-slate-800">
-                                ${state.reports.map(rep => `
-                                    <tr class="hover:bg-slate-800/50">
-                                        <td class="px-4 py-3 font-semibold text-slate-100">${rep.title}</td>
-                                        <td class="px-4 py-3 text-slate-400">${rep.category}</td>
-                                        <td class="px-4 py-3 text-right"><button onclick="deleteReport('${rep.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+                    <div class="space-y-3">
+                        ${state.reports.map(rep => `
+                            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-2 relative">
+                                <div class="flex items-center space-x-2">
+                                    <span class="px-2 py-0.5 text-[10px] font-bold bg-blue-950 text-blue-400 border border-blue-800 rounded">${rep.category || 'Genel'}</span>
+                                    <h4 class="font-bold text-slate-100 text-base">${rep.title}</h4>
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed">${rep.description || 'Açıklama girilmemiş.'}</p>
+                                <button onclick="deleteReport('${rep.id}')" class="absolute top-4 right-4 text-slate-500 hover:text-red-400 text-xs cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
+                        `).join('')}
                     </div>
                 </div>
             `;
@@ -499,17 +359,9 @@
         function renderActivitiesView() {
             return `
                 <div class="space-y-6">
-                    <div class="flex items-center justify-between">
-                        <div><h2 class="text-lg font-bold text-slate-100">📡 Saha Faaliyetleri & Tatbikatlar</h2><p class="text-xs text-slate-400">Arama-kurtarma tatbikatları ve saha görevleri</p></div>
-                        <button onclick="openAddActivityModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Faaliyet Ekle</button>
-                    </div>
+                    <div class="flex items-center justify-between"><div><h2 class="text-lg font-bold text-slate-100">📡 Saha Faaliyetleri & Tatbikatlar</h2></div><button onclick="openAddActivityModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Faaliyet Ekle</button></div>
                     <div class="space-y-3">
-                        ${state.activities.map(a => `
-                            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-center justify-between">
-                                <div><h4 class="font-bold text-slate-100 text-sm">${a.title}</h4><p class="text-xs text-slate-400 mt-1">${a.description || ''} • <span class="text-red-400">${a.location || ''}</span></p></div>
-                                <button onclick="deleteActivity('${a.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>
-                            </div>
-                        `).join('')}
+                        ${state.activities.map(a => `<div class="bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-center justify-between"><div><h4 class="font-bold text-slate-100 text-sm">${a.title}</h4><p class="text-xs text-slate-400 mt-1">${a.description || ''} • <span class="text-red-400">${a.location || ''}</span></p></div><button onclick="deleteActivity('${a.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></div>`).join('')}
                     </div>
                 </div>
             `;
@@ -518,36 +370,18 @@
         function renderAnnouncementsView() {
             return `
                 <div class="space-y-6">
-                    <div class="flex items-center justify-between">
-                        <div><h2 class="text-lg font-bold text-slate-100">📢 Duyurular & Bilgilendirmeler</h2><p class="text-xs text-slate-400">Üyelere anlık bildirim yayını</p></div>
-                        <button onclick="openAddAnnouncementModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Duyuru Ekle</button>
-                    </div>
+                    <div class="flex items-center justify-between"><div><h2 class="text-lg font-bold text-slate-100">📢 Duyurular & Bilgilendirmeler</h2></div><button onclick="openAddAnnouncementModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Duyuru Ekle</button></div>
                     <div class="space-y-3">
-                        ${state.announcements.map(ann => `
-                            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-2 relative">
-                                <h4 class="font-bold text-slate-100 text-base">${ann.title}</h4>
-                                <p class="text-xs text-slate-300">${ann.content}</p>
-                                <button onclick="deleteAnnouncement('${ann.id}')" class="absolute top-4 right-4 text-slate-500 hover:text-red-400 text-xs cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>
-                            </div>
-                        `).join('')}
+                        ${state.announcements.map(ann => `<div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-2 relative"><h4 class="font-bold text-slate-100 text-base">${ann.title}</h4><p class="text-xs text-slate-300">${ann.content}</p><button onclick="deleteAnnouncement('${ann.id}')" class="absolute top-4 right-4 text-slate-500 hover:text-red-400 text-xs cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></div>`).join('')}
                     </div>
                 </div>
             `;
         }
 
         function renderMobileSimulatorView() {
-            return `
-                <div class="space-y-6">
-                    <h2 class="text-lg font-bold text-slate-100">📱 Mobil Uygulama & API Entegrasyonu</h2>
-                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-4">
-                        <label class="block text-xs text-slate-400">Mobil Endpoint URL</label>
-                        <input type="text" readonly value="https://api.atak.org.tr/v1/mobile-sync" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-emerald-400">
-                    </div>
-                </div>
-            `;
+            return `<div class="space-y-6"><h2 class="text-lg font-bold text-slate-100">📱 Mobil Uygulama & API</h2><div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><input type="text" readonly value="https://api.atak.org.tr/v1/mobile-sync" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-emerald-400"></div></div>`;
         }
 
-        // --- MODALS ---
         function openModal(title, html) {
             document.getElementById('modal-title').innerText = title;
             document.getElementById('modal-body').innerHTML = html;
@@ -555,38 +389,18 @@
         }
         function closeModal() { document.getElementById('universal-modal').classList.add('hidden'); }
 
-        // Üye Düzenleme Modalı
         function openEditMemberModal(id) {
             const member = state.users.find(u => u.id === id);
             if (!member) return;
 
             openModal("Üye Bilgilerini Düzenle", `
                 <form onsubmit="handleEditMember(event, '${member.id}')" class="space-y-3">
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Ad Soyad</label>
-                        <input type="text" id="edit-name" required value="${member.full_name || ''}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Callsign</label>
-                        <input type="text" id="edit-callsign" value="${member.callsign || ''}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Kan Grubu</label>
-                        <select id="edit-blood" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
-                            ${['A Rh+', 'A Rh-', 'B Rh+', 'B Rh-', '0 Rh+', '0 Rh-', 'AB Rh+', 'AB Rh-'].map(b => `<option ${member.blood === b ? 'selected' : ''}>${b}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Telefon Numarası</label>
-                        <input type="tel" id="edit-phone" value="${member.phone || ''}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Yönetim Rolü</label>
-                        <select id="edit-role" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
-                            ${['Yönetim Kurulu Başkanı', 'Başkan Yardımcısı', 'Genel Sekreter', 'Sayman', 'Normal Üye'].map(r => `<option ${member.role === r ? 'selected' : ''}>${r}</option>`).join('')}
-                        </select>
-                    </div>
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer mt-2">Değişiklikleri Kaydet</button>
+                    <div><label class="block text-xs text-slate-400 mb-1">Ad Soyad</label><input type="text" id="edit-name" required value="${member.full_name || ''}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Callsign</label><input type="text" id="edit-callsign" value="${member.callsign || ''}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Kan Grubu</label><select id="edit-blood" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">${['A Rh+', 'A Rh-', 'B Rh+', 'B Rh-', '0 Rh+', '0 Rh-', 'AB Rh+', 'AB Rh-'].map(b => `<option ${member.blood === b ? 'selected' : ''}>${b}</option>`).join('')}</select></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Telefon Numarası</label><input type="tel" id="edit-phone" value="${member.phone || ''}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Yönetim Rolü</label><select id="edit-role" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">${['Yönetim Kurulu Başkanı', 'Başkan Yardımcısı', 'Genel Sekreter', 'Sayman', 'Normal Üye'].map(r => `<option ${member.role === r ? 'selected' : ''}>${r}</option>`).join('')}</select></div>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer mt-2">Kaydet</button>
                 </form>
             `);
         }
@@ -599,75 +413,64 @@
             const phone = document.getElementById('edit-phone').value;
             const role = document.getElementById('edit-role').value;
 
-            const { error } = await supabaseClient.from('members').update({ full_name, callsign, blood, phone, role }).eq('id', id);
-            if (error) {
-                showNotification("Güncelleme Hatası: " + error.message, 'danger');
-            } else {
-                showNotification("Üye bilgileri başarıyla güncellendi.");
-                closeModal();
-                await fetchAllData();
-                render();
+            try {
+                await supabaseClient.from('members').update({ full_name, callsign, blood, phone, role }).eq('id', id);
+            } catch (err) {
+                await supabaseClient.from('members').update({ full_name, callsign, role }).eq('id', id);
             }
-        }
 
-        async function openAddDueModal() {
-            const { data: members } = await supabaseClient.from('members').select('id, full_name');
-            const opts = members ? members.map(m => `<option value="${m.id}">${m.full_name}</option>`).join('') : '';
-            openModal("Yeni Aidat Kaydı Ekle", `
-                <form onsubmit="handleAddDue(event)" class="space-y-3">
-                    <select id="due-member" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">${opts}</select>
-                    <input type="number" id="due-amount" required value="500" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100" placeholder="Tutar">
-                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button>
-                </form>
-            `);
-        }
-        async function handleAddDue(e) {
-            e.preventDefault();
-            const member_id = document.getElementById('due-member').value;
-            const amount = parseFloat(document.getElementById('due-amount').value);
-            await supabaseClient.from('dues').insert([{ member_id, amount, status: 'Ödendi' }]);
-            closeModal(); await fetchAllData(); render();
-        }
-
-        function openAddRepeaterModal() {
-            openModal("Röle Ekle", `
-                <form onsubmit="handleAddRepeater(event)" class="space-y-3">
-                    <input type="text" id="rpt-name" required placeholder="Röle Adı" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
-                    <input type="text" id="rpt-freq" required placeholder="Frekans" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
-                    <input type="text" id="rpt-loc" placeholder="Konum" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
-                    <button type="submit" class="w-full bg-red-600 hover:bg-red-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button>
-                </form>
-            `);
-        }
-        async function handleAddRepeater(e) {
-            e.preventDefault();
-            await supabaseClient.from('repeaters').insert([{ name: document.getElementById('rpt-name').value, frequency: document.getElementById('rpt-freq').value, location: document.getElementById('rpt-loc').value }]);
-            closeModal(); await fetchAllData(); render();
+            showNotification("Üye bilgileri güncellendi.");
+            closeModal();
+            await fetchAllData();
+            render();
         }
 
         function openAddReportModal() {
-            openModal("Röle / Rapor Ekle", `
+            openModal("Detaylı Rapor Ekle", `
                 <form onsubmit="handleAddReport(event)" class="space-y-3">
-                    <input type="text" id="rep-title" required placeholder="Röle Adı / Başlık" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
-                    <input type="text" id="rep-cat" required placeholder="Kategori" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
-                    <button type="submit" class="w-full bg-red-600 hover:bg-red-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button>
+                    <div><label class="block text-xs text-slate-400 mb-1">Rapor Başlığı</label><input type="text" id="rep-title" required placeholder="Örn: 2026 Yılı Telsiz Kapsama Raporu" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Kategori</label><input type="text" id="rep-cat" required placeholder="Örn: Operasyonel / Teknik" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Rapor Açıklaması / Detayı</label><textarea id="rep-desc" rows="4" required placeholder="Rapor detaylarını buraya yazın..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></textarea></div>
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Raporu Kaydet</button>
                 </form>
             `);
         }
         async function handleAddReport(e) {
             e.preventDefault();
-            await supabaseClient.from('reports').insert([{ title: document.getElementById('rep-title').value, category: document.getElementById('rep-cat').value }]);
+            const title = document.getElementById('rep-title').value;
+            const category = document.getElementById('rep-cat').value;
+            const description = document.getElementById('rep-desc').value;
+
+            try {
+                await supabaseClient.from('reports').insert([{ title, category, description }]);
+            } catch (err) {
+                await supabaseClient.from('reports').insert([{ title, category }]);
+            }
+            closeModal(); await fetchAllData(); render();
+        }
+
+        async function openAddDueModal() {
+            const { data: members } = await supabaseClient.from('members').select('id, full_name');
+            const opts = members ? members.map(m => `<option value="${m.id}">${m.full_name}</option>`).join('') : '';
+            openModal("Aidat Ekle", `<form onsubmit="handleAddDue(event)" class="space-y-3"><select id="due-member" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">${opts}</select><input type="number" id="due-amount" required value="500" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><button type="submit" class="w-full bg-emerald-600 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button></form>`);
+        }
+        async function handleAddDue(e) {
+            e.preventDefault();
+            await supabaseClient.from('dues').insert([{ member_id: document.getElementById('due-member').value, amount: parseFloat(document.getElementById('due-amount').value), status: 'Ödendi' }]);
+            closeModal(); await fetchAllData(); render();
+        }
+
+        function openAddRepeaterModal() {
+            openModal("Röle Ekle", `<form onsubmit="handleAddRepeater(event)" class="space-y-3"><input type="text" id="rpt-name" required placeholder="Röle Adı" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><input type="text" id="rpt-freq" required placeholder="Frekans" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><button type="submit" class="w-full bg-red-600 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button></form>`);
+        }
+        async function handleAddRepeater(e) {
+            e.preventDefault();
+            await supabaseClient.from('repeaters').insert([{ name: document.getElementById('rpt-name').value, frequency: document.getElementById('rpt-freq').value }]);
             closeModal(); await fetchAllData(); render();
         }
 
         function openAddActivityModal() {
-            openModal("Saha Faaliyeti Ekle", `
-                <form onsubmit="handleAddActivity(event)" class="space-y-3">
-                    <input type="text" id="act-title" required placeholder="Başlık" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
-                    <input type="text" id="act-loc" required placeholder="Konum" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
-                    <button type="submit" class="w-full bg-amber-600 hover:bg-amber-500 text-slate-950 py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button>
-                </form>
-            `);
+            openModal("Faaliyet Ekle", `<form onsubmit="handleAddActivity(event)" class="space-y-3"><input type="text" id="act-title" required placeholder="Başlık" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><input type="text" id="act-loc" required placeholder="Konum" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><button type="submit" class="w-full bg-amber-600 text-slate-950 py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button></form>`);
         }
         async function handleAddActivity(e) {
             e.preventDefault();
@@ -676,13 +479,7 @@
         }
 
         function openAddAnnouncementModal() {
-            openModal("Duyuru Ekle", `
-                <form onsubmit="handleAddAnnouncement(event)" class="space-y-3">
-                    <input type="text" id="ann-title" required placeholder="Başlık" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
-                    <textarea id="ann-content" required placeholder="İçerik" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></textarea>
-                    <button type="submit" class="w-full bg-red-600 hover:bg-red-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Yayınla</button>
-                </form>
-            `);
+            openModal("Duyuru Ekle", `<form onsubmit="handleAddAnnouncement(event)" class="space-y-3"><input type="text" id="ann-title" required placeholder="Başlık" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><textarea id="ann-content" required placeholder="İçerik" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></textarea><button type="submit" class="w-full bg-red-600 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Yayınla</button></form>`);
         }
         async function handleAddAnnouncement(e) {
             e.preventDefault();
@@ -690,7 +487,6 @@
             closeModal(); await fetchAllData(); render();
         }
 
-        // --- DELETIONS & APPROVALS ---
         window.approveMember = async (id) => { await supabaseClient.from('members').update({ status: 'Aktif' }).eq('id', id); await fetchAllData(); render(); };
         window.deleteMember = async (id) => { if(confirm("Silmek istediğinize emin misiniz?")) { await supabaseClient.from('members').delete().eq('id', id); await fetchAllData(); render(); } };
         window.deleteDue = async (id) => { await supabaseClient.from('dues').delete().eq('id', id); await fetchAllData(); render(); };
@@ -699,13 +495,9 @@
         window.deleteActivity = async (id) => { await supabaseClient.from('field_activities').delete().eq('id', id); await fetchAllData(); render(); };
         window.deleteAnnouncement = async (id) => { await supabaseClient.from('announcements').delete().eq('id', id); await fetchAllData(); render(); };
 
-        // --- RENDER ROUTER ---
         function render() {
             const root = document.getElementById('app');
-            if (!state.currentUser) {
-                root.innerHTML = renderAuthScreen() + renderNotification();
-                return;
-            }
+            if (!state.currentUser) { root.innerHTML = renderAuthScreen() + renderNotification(); return; }
 
             let content = '';
             switch(state.activeTab) {
@@ -737,7 +529,6 @@
                     </div>
                 </div>
             `;
-
             setTimeout(initCharts, 50);
         }
 
@@ -747,19 +538,11 @@
                 if (ctxBlood) {
                     const counts = {};
                     state.users.forEach(u => { const b = u.blood || '0 Rh+'; counts[b] = (counts[b] || 0) + 1; });
-                    new Chart(ctxBlood, {
-                        type: 'doughnut',
-                        data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#DC2626', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#6366F1'] }] },
-                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94A3B8' } } } }
-                    });
+                    new Chart(ctxBlood, { type: 'doughnut', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#DC2626', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#6366F1'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94A3B8' } } } } });
                 }
                 const ctxFee = document.getElementById('chartFeeTrend');
                 if (ctxFee) {
-                    new Chart(ctxFee, {
-                        type: 'bar',
-                        data: { labels: ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran'], datasets: [{ label: 'Tahsilat (₺)', data: [1500, 2000, 1800, 2500, 3100, 2800], backgroundColor: '#10B981' }] },
-                        options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { color: '#94A3B8' } }, y: { ticks: { color: '#94A3B8' } } }, plugins: { legend: { labels: { color: '#94A3B8' } } } }
-                    });
+                    new Chart(ctxFee, { type: 'bar', data: { labels: ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran'], datasets: [{ label: 'Tahsilat (₺)', data: [1500, 2000, 1800, 2500, 3100, 2800], backgroundColor: '#10B981' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { color: '#94A3B8' } }, y: { ticks: { color: '#94A3B8' } } }, plugins: { legend: { labels: { color: '#94A3B8' } } } } });
                 }
             }
         }
