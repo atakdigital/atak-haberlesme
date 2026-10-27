@@ -116,7 +116,7 @@
     <!-- SCRIPTS -->
     <script>
         const SUPABASE_URL = "https://iywgxfemglgixjplenyw.supabase.co";
-        const SUPABASE_KEY = "sb_publishable_FNlMWgu7kmECpYbDLkC3BA_9emOSPy4";
+        const SUPABASE_KEY = "sb_publishable_FNfMMugx7kaECpYbDLkC3BA_9eeO5Py1";
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         let currentUser = null;
 
@@ -190,7 +190,6 @@
                     document.getElementById('user-role-badge').innerText = member.role;
                     document.getElementById('current-user-info').innerText = `${member.full_name} (${member.callsign || 'Rol Yok'})`;
 
-                    // Üye yönetimi sadece üst yönetim görebilsin
                     if (!['Yönetim Kurulu Başkanı', 'Başkan Yardımcısı', 'Sayman', 'Genel Sekreter'].includes(member.role)) {
                         const mBtn = document.getElementById('nav-members');
                         if (mBtn) mBtn.style.display = 'none';
@@ -264,28 +263,34 @@
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="font-bold text-lg">Afet ve Haberleşme Saha Görevleri</h3>
-                            ${isManagement() ? `<button onclick="alert('Yeni saha faaliyeti ekleme paneli')" class="bg-red-600 hover:bg-red-700 text-xs px-3 py-2 rounded font-semibold">+ Faaliyet Ekle</button>` : ''}
+                            ${isManagement() ? `<button onclick="openAddActivityModal()" class="bg-red-600 hover:bg-red-700 text-xs px-3 py-2 rounded font-semibold">+ Faaliyet Ekle</button>` : ''}
                         </div>
-                        <p class="text-slate-400 text-sm">Aktif saha görevleri listelenmektedir.</p>
+                        <div class="space-y-3" id="activities-list">
+                            <p class="text-slate-400 text-sm">Faaliyetler yükleniyor...</p>
+                        </div>
                     </div>
                 `;
+                loadActivities();
             } else if (tabName === 'announcements') {
                 title.innerText = "Duyurular ve Bildirimler";
                 content.innerHTML = `
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="font-bold text-lg">Dernek İçi Duyurular</h3>
-                            ${isManagement() ? `<button onclick="alert('Duyuru ekleme paneli')" class="bg-red-600 hover:bg-red-700 text-xs px-3 py-2 rounded font-semibold">+ Duyuru Yayınla</button>` : ''}
+                            ${isManagement() ? `<button onclick="openAddAnnouncementModal()" class="bg-red-600 hover:bg-red-700 text-xs px-3 py-2 rounded font-semibold">+ Duyuru Yayınla</button>` : ''}
                         </div>
-                        <p class="text-slate-400 text-sm">Yönetim duyuruları burada görünür.</p>
+                        <div class="space-y-3" id="announcements-list">
+                            <p class="text-slate-400 text-sm">Duyurular yükleniyor...</p>
+                        </div>
                     </div>
                 `;
+                loadAnnouncements();
             } else if (tabName === 'reports') {
                 title.innerText = "Gelişmiş Raporlar ve Analizler";
                 content.innerHTML = `
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
                         <h3 class="font-bold text-lg mb-4">Dernek İstatistiksel Raporları</h3>
-                        <p class="text-slate-400 text-sm">Finansal ve operasyonel analiz özeti.</p>
+                        <p class="text-slate-400 text-sm">Üye dağılımı, aidat performansları ve operasyonel özet raporları bu alanda yer almaktadır.</p>
                     </div>
                 `;
             }
@@ -297,8 +302,12 @@
                 document.getElementById('stat-active').innerText = members.filter(m => m.status === 'Aktif').length;
                 document.getElementById('stat-pending').innerText = members.filter(m => m.status === 'Onay Bekliyor').length;
             }
-            document.getElementById('stat-dues').innerText = "12.450 ₺";
-            document.getElementById('stat-activities').innerText = "2 Aktif";
+            const { data: dues } = await supabaseClient.from('dues').select('amount');
+            const totalDues = dues ? dues.reduce((sum, d) => sum + (d.amount || 0), 0) : 0;
+            document.getElementById('stat-dues').innerText = totalDues + " ₺";
+
+            const { data: acts } = await supabaseClient.from('field_activities').select('*');
+            document.getElementById('stat-activities').innerText = (acts ? acts.length : 0) + " Faaliyet";
         }
 
         async function loadMembersTable() {
@@ -330,18 +339,15 @@
 
         async function loadDuesTable() {
             let query = supabaseClient.from('dues').select('*, members(full_name)');
-            // Eğer yönetimde değilse sadece kendi aidatlarını görsün
             if (!isManagement()) {
                 query = query.eq('member_id', currentUser.id);
             }
             const { data: dues } = await query;
             const tbody = document.getElementById('dues-table-body');
-            
             if (!dues || dues.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-400">Aidat kaydı bulunamadı.</td></tr>`;
                 return;
             }
-
             tbody.innerHTML = dues.map(d => `
                 <tr class="border-b border-slate-800/50 hover:bg-slate-800/20">
                     <td class="py-3 font-medium">${d.members?.full_name || 'Üye'}</td>
@@ -353,20 +359,89 @@
             `).join('');
         }
 
+        async function loadActivities() {
+            const { data: acts } = await supabaseClient.from('field_activities').select('*');
+            const container = document.getElementById('activities-list');
+            if (!acts || acts.length === 0) {
+                container.innerHTML = `<p class="text-slate-400 text-sm">Kayıtlı saha faaliyeti bulunmuyor.</p>`;
+                return;
+            }
+            container.innerHTML = acts.map(a => `
+                <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl flex justify-between items-center">
+                    <div>
+                        <h4 class="font-bold text-sm text-red-400">${a.title}</h4>
+                        <p class="text-xs text-slate-400 mt-1">${a.description || ''} • <span class="text-slate-300 font-semibold">${a.location || ''}</span></p>
+                    </div>
+                    ${isManagement() ? `<button onclick="deleteActivity('${a.id}')" class="text-red-400 hover:text-red-300 text-xs"><i class="fa-solid fa-trash"></i></button>` : ''}
+                </div>
+            `).join('');
+        }
+
+        async function loadAnnouncements() {
+            const { data: anns } = await supabaseClient.from('announcements').select('*');
+            const container = document.getElementById('announcements-list');
+            if (!anns || anns.length === 0) {
+                container.innerHTML = `<p class="text-slate-400 text-sm">Aktif duyuru bulunmuyor.</p>`;
+                return;
+            }
+            container.innerHTML = anns.map(ann => `
+                <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl flex justify-between items-center">
+                    <div>
+                        <h4 class="font-bold text-sm text-blue-400">${ann.title}</h4>
+                        <p class="text-xs text-slate-400 mt-1">${ann.content || ''}</p>
+                    </div>
+                    ${isManagement() ? `<button onclick="deleteAnnouncement('${ann.id}')" class="text-red-400 hover:text-red-300 text-xs"><i class="fa-solid fa-trash"></i></button>` : ''}
+                </div>
+            `).join('');
+        }
+
         async function openAddDueModal() {
-            const memberId = prompt("Üye ID giriniz veya e-posta ile eşleştiriniz:");
+            const memberId = prompt("Üye ID giriniz (veya üyeler tablosundan kopyalayınız):");
             const amount = prompt("Aidat Tutarı (₺):", "500");
             const period = prompt("Dönem / Ay:", "Kasım 2026");
             if (memberId && amount) {
-                await supabaseClient.from('dues').insert([{ member_id: memberId, amount: parseFloat(amount), period, status: 'Ödenmedi' }]);
+                await supabaseClient.from('dues').insert([{ member_id: memberId, amount: parseFloat(amount), period, status: 'Ödendi' }]);
                 loadDuesTable();
             }
         }
 
+        async function openAddActivityModal() {
+            const title = prompt("Faaliyet Başlığı:");
+            const description = prompt("Açıklama:");
+            const location = prompt("Konum:");
+            if (title) {
+                await supabaseClient.from('field_activities').insert([{ title, description, location }]);
+                loadActivities();
+            }
+        }
+
+        async function openAddAnnouncementModal() {
+            const title = prompt("Duyuru Başlığı:");
+            const content = prompt("Duyuru İçeriği:");
+            if (title && content) {
+                await supabaseClient.from('announcements').insert([{ title, content }]);
+                loadAnnouncements();
+            }
+        }
+
         async function deleteDue(id) {
-            if (confirm("Bu aidat kaydını silmek istediğinize emin misiniz?")) {
+            if (confirm("Silmek istediğinize emin misiniz?")) {
                 await supabaseClient.from('dues').delete().eq('id', id);
                 loadDuesTable();
+            }
+        }
+
+        async function deleteActivity(id) {
+            if (confirm("Silmek istediğinize emin misiniz?")) {
+                await supabaseClient.from('field_activities').delete().eq('id', id);
+                loadActivities();
+            }
+        }
+
+        async function deleteAnnouncement(id) {
+            if (confirm("Silmek istediğinize emin misiniz?")) {
+                await supabaseClient.from('announcements').delete().eq('id', id);
+                loadAnnouncements();
             }
         }
 
