@@ -299,14 +299,16 @@
             } else if (tabName === 'telsiz') {
                 content.innerHTML = `
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-                        <h3 class="font-bold text-lg text-red-400"><i class="fa-solid fa-tower-broadcast"></i> Afet & Telsiz Haberleşme Frekansları</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800"><h4 class="font-bold text-red-500">Marmara Röle (RPT-1)</h4><p class="text-xs text-slate-400 mt-1">Frekans: 145.750 MHz</p></div>
-                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800"><h4 class="font-bold text-red-500">Ulusal Afet Kanalı</h4><p class="text-xs text-slate-400 mt-1">Simplex: 145.500 MHz</p></div>
-                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800"><h4 class="font-bold text-red-500">Deprem Acil Telsiz</h4><p class="text-xs text-slate-400 mt-1">UHF RPT: 439.125 MHz</p></div>
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-bold text-lg text-red-400"><i class="fa-solid fa-tower-broadcast"></i> Afet & Telsiz Haberleşme Frekansları</h3>
+                            ${isManagement() ? `<button onclick="showAddRepeaterModal()" class="bg-red-600 hover:bg-red-700 text-xs px-4 py-2 rounded-lg font-semibold transition">+ Röle / Frekans Ekle</button>` : ''}
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4" id="repeaters-grid">
+                            <p class="text-slate-400 text-sm">Röleler yükleniyor...</p>
                         </div>
                     </div>
                 `;
+                loadRepeaters();
             } else if (tabName === 'reports') {
                 content.innerHTML = `
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
@@ -407,6 +409,24 @@
             `).join('');
         }
 
+        async function loadRepeaters() {
+            const { data: repeaters } = await supabaseClient.from('repeaters').select('*');
+            const container = document.getElementById('repeaters-grid');
+            if (!repeaters || repeaters.length === 0) {
+                container.innerHTML = `<p class="text-slate-400 text-sm">Kayıtlı röle istasyonu bulunmuyor.</p>`;
+                return;
+            }
+            container.innerHTML = repeaters.map(r => `
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 relative">
+                    <h4 class="font-bold text-red-500">${r.name}</h4>
+                    <p class="text-xs text-slate-400 mt-1">Frekans: ${r.frequency}</p>
+                    <p class="text-xs text-slate-400">Tone: ${r.tone || '-'}</p>
+                    <p class="text-xs text-slate-400">Konum: ${r.location || '-'}</p>
+                    ${isManagement() ? `<button onclick="deleteRepeater('${r.id}')" class="absolute top-3 right-3 text-red-400 hover:text-red-300 text-xs"><i class="fa-solid fa-trash"></i></button>` : ''}
+                </div>
+            `).join('');
+        }
+
         async function loadActivities() {
             const { data: acts } = await supabaseClient.from('field_activities').select('*');
             const container = document.getElementById('activities-list');
@@ -443,7 +463,7 @@
             `).join('');
         }
 
-        // MODAL (AÇILIR PENCERE) FORMLARI VE ÜYE LİSTELEME
+        // MODAL (AÇILIR PENCERE) FORMLARI
         async function showAddDueModal() {
             const { data: members } = await supabaseClient.from('members').select('id, full_name');
             const options = members ? members.map(m => `<option value="${m.id}">${m.full_name}</option>`).join('') : '';
@@ -452,19 +472,43 @@
                 <form onsubmit="handleAddDue(event)" class="space-y-4">
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Üye Seçin</label>
-                        <select id="due-member-id" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600 text-slate-200">
+                        <select id="due-member-id" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm text-slate-200">
                             ${options}
                         </select>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Aidat Tutarı (₺)</label>
-                        <input type="number" id="due-amount" required value="500" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
+                        <input type="number" id="due-amount" required value="500" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Dönem / Sezon</label>
-                        <input type="text" id="due-period" required value="2026 Sezonu" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
+                        <input type="text" id="due-period" required value="2026 Sezonu" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
                     </div>
                     <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition">Aidatı Kaydet</button>
+                </form>
+            `);
+        }
+
+        function showAddRepeaterModal() {
+            openModal("Yeni Röle İstasyonu Ekle", `
+                <form onsubmit="handleAddRepeater(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Röle Adı</label>
+                        <input type="text" id="rpt-name" required placeholder="Örn: Marmara Röle (RPT-1)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Frekans</label>
+                        <input type="text" id="rpt-freq" required placeholder="Örn: 145.750 MHz" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Tone (CTCSS)</label>
+                        <input type="text" id="rpt-tone" placeholder="Örn: 88.5 Hz" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Konum / Bölge</label>
+                        <input type="text" id="rpt-loc" placeholder="Örn: Çataldağ / Bursa" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
+                    </div>
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition">Röleyi Kaydet</button>
                 </form>
             `);
         }
@@ -474,15 +518,15 @@
                 <form onsubmit="handleAddActivity(event)" class="space-y-4">
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Faaliyet Başlığı</label>
-                        <input type="text" id="act-title" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
+                        <input type="text" id="act-title" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Açıklama</label>
-                        <textarea id="act-desc" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600"></textarea>
+                        <textarea id="act-desc" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm"></textarea>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Konum / Bölge</label>
-                        <input type="text" id="act-loc" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
+                        <input type="text" id="act-loc" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
                     </div>
                     <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition">Faaliyeti Kaydet</button>
                 </form>
@@ -494,18 +538,18 @@
                 <form onsubmit="handleAddAnnouncement(event)" class="space-y-4">
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Duyuru Başlığı</label>
-                        <input type="text" id="ann-title" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
+                        <input type="text" id="ann-title" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">İçerik</label>
-                        <textarea id="ann-content" rows="4" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600"></textarea>
+                        <textarea id="ann-content" rows="4" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm"></textarea>
                     </div>
                     <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition">Duyuruyu Yayınla</button>
                 </form>
             `);
         }
 
-        // VERİTABANI İŞLEMLERİ
+        // VERITABANI EKLEME VE SİLME İŞLEMLERİ
         async function handleAddDue(e) {
             e.preventDefault();
             const member_id = document.getElementById('due-member-id').value;
@@ -515,6 +559,18 @@
             const { error } = await supabaseClient.from('dues').insert([{ member_id, amount, period, status: 'Ödendi' }]);
             if (error) alert("Hata: " + error.message);
             else { closeModal(); loadDuesTable(); }
+        }
+
+        async function handleAddRepeater(e) {
+            e.preventDefault();
+            const name = document.getElementById('rpt-name').value;
+            const frequency = document.getElementById('rpt-freq').value;
+            const tone = document.getElementById('rpt-tone').value;
+            const location = document.getElementById('rpt-loc').value;
+
+            const { error } = await supabaseClient.from('repeaters').insert([{ name, frequency, tone, location }]);
+            if (error) alert("Hata: " + error.message);
+            else { closeModal(); loadRepeaters(); }
         }
 
         async function handleAddActivity(e) {
@@ -532,8 +588,9 @@
             e.preventDefault();
             const title = document.getElementById('ann-title').value;
             const content = document.getElementById('ann-content').value;
+            const author = currentUser ? currentUser.full_name : 'Yönetim';
 
-            const { error } = await supabaseClient.from('announcements').insert([{ title, content }]);
+            const { error } = await supabaseClient.from('announcements').insert([{ title, content, author }]);
             if (error) alert("Hata: " + error.message);
             else { closeModal(); loadAnnouncements(); }
         }
@@ -542,6 +599,13 @@
             if (confirm("Silmek istediğinize emin misiniz?")) {
                 await supabaseClient.from('dues').delete().eq('id', id);
                 loadDuesTable();
+            }
+        }
+
+        async function deleteRepeater(id) {
+            if (confirm("Bu röleyi silmek istediğinize emin misiniz?")) {
+                await supabaseClient.from('repeaters').delete().eq('id', id);
+                loadRepeaters();
             }
         }
 
