@@ -23,11 +23,11 @@
             </div>
 
             <div class="flex border-b border-slate-800 mb-6">
-                <button id="tab-login-btn" onclick="switchAuthTab('login')" class="flex-1 pb-3 text-sm font-semibold border-b-2 border-red-600 text-red-500 transition">Giriş Yap</button>
-                <button id="tab-register-btn" onclick="switchAuthTab('register')" class="flex-1 pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition">Kayıt Ol</button>
+                <button type="button" id="tab-login-btn" class="flex-1 pb-3 text-sm font-semibold border-b-2 border-red-600 text-red-500 transition">Giriş Yap</button>
+                <button type="button" id="tab-register-btn" class="flex-1 pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition">Kayıt Ol</button>
             </div>
 
-            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+            <form id="login-form" class="space-y-4">
                 <div>
                     <label class="block text-xs font-medium text-slate-400 mb-1">E-posta Adresi</label>
                     <input type="email" id="login-email" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-red-600">
@@ -39,7 +39,7 @@
                 <button type="submit" class="w-full bg-red-600 hover:bg-red-700 font-semibold py-2.5 rounded-lg text-sm transition">Giriş Yap</button>
             </form>
 
-            <form id="register-form" onsubmit="handleRegister(event)" class="space-y-4 hidden">
+            <form id="register-form" class="space-y-4 hidden">
                 <div>
                     <label class="block text-xs font-medium text-slate-400 mb-1">Ad Soyad</label>
                     <input type="text" id="reg-name" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
@@ -88,8 +88,4 @@
                 <button onclick="switchTab('activities')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
                     <i class="fa-solid fa-map-location-dot w-5"></i><span>Saha Faaliyetleri</span>
                 </button>
-                <button onclick="switchTab('announcements')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
-                    <i class="fa-solid fa-bullhorn w-5"></i><span>Duyurular</span>
-                </button>
-                <button onclick="switchTab('reports')" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
-                    <i class="fa-solid fa-chart-line w-
+                <button onclick="switchTab'
