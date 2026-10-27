@@ -107,7 +107,6 @@
 
         <!-- CONTENT AREA -->
         <main class="flex-1 flex flex-col h-screen overflow-hidden">
-            <!-- TOPBAR -->
             <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-center">
                 <div class="flex items-center space-x-4">
                     <div class="bg-red-600/20 text-red-500 p-2 rounded-xl"><i class="fa-solid fa-tower-broadcast text-lg"></i></div>
@@ -127,7 +126,6 @@
                 </div>
             </header>
 
-            <!-- TAB CONTENT -->
             <div id="tab-content" class="flex-1 p-6 overflow-y-auto space-y-6"></div>
         </main>
     </div>
@@ -259,13 +257,6 @@
                         <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><p class="text-slate-400 text-xs">Aktif Saha Faaliyetleri</p><h3 id="stat-activities" class="text-2xl font-bold mt-1 text-purple-400">-</h3><p class="text-[10px] text-slate-500 mt-1">Tatbikat & Röle Bakımı</p></div>
                         <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><p class="text-slate-400 text-xs">Onay Bekleyen Üye</p><h3 id="stat-pending" class="text-2xl font-bold mt-1 text-amber-400">-</h3><p class="text-[10px] text-slate-500 mt-1">Başkan Onayı Bekleniyor</p></div>
                     </div>
-                    <div id="pending-alert-box" class="hidden bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex justify-between items-center">
-                        <div class="flex items-center space-x-3 text-amber-400 text-sm font-semibold">
-                            <i class="fa-solid fa-triangle-exclamation text-lg"></i>
-                            <span>Onay Bekleyen Üyelik Başvuruları Var. Yönetim kurulu yetkinizle üyeleri inceleyip onaylayabilirsiniz.</span>
-                        </div>
-                        <button onclick="switchTab('members')" class="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs px-4 py-2 rounded-lg transition">Üye Listesine Git</button>
-                    </div>
                 `;
                 loadDashboardStats();
             } else if (tabName === 'members') {
@@ -309,11 +300,10 @@
                 content.innerHTML = `
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
                         <h3 class="font-bold text-lg text-red-400"><i class="fa-solid fa-tower-broadcast"></i> Afet & Telsiz Haberleşme Frekansları</h3>
-                        <p class="text-slate-400 text-sm">Aktif röle istasyonları, VHF/UHF acil durum frekansları ve saha haberleşme planı.</p>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800"><h4 class="font-bold text-red-500">Marmara Röle (RPT-1)</h4><p class="text-xs text-slate-400 mt-1">Frekans: 145.750 MHz<p class="text-xs text-slate-400">Tone: 88.5 Hz</p></div>
-                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800"><h4 class="font-bold text-red-500">Ulusal Afet Kanalı</h4><p class="text-xs text-slate-400 mt-1">Simplex: 145.500 MHz</p><p class="text-xs text-slate-400">Mod: FM</p></div>
-                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800"><h4 class="font-bold text-red-500">Deprem Acil Telsiz</h4><p class="text-xs text-slate-400 mt-1">UHF RPT: 439.125 MHz</p><p class="text-xs text-slate-400">Tone: 77.0 Hz</p></div>
+                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800"><h4 class="font-bold text-red-500">Marmara Röle (RPT-1)</h4><p class="text-xs text-slate-400 mt-1">Frekans: 145.750 MHz</p></div>
+                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800"><h4 class="font-bold text-red-500">Ulusal Afet Kanalı</h4><p class="text-xs text-slate-400 mt-1">Simplex: 145.500 MHz</p></div>
+                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800"><h4 class="font-bold text-red-500">Deprem Acil Telsiz</h4><p class="text-xs text-slate-400 mt-1">UHF RPT: 439.125 MHz</p></div>
                         </div>
                     </div>
                 `;
@@ -321,7 +311,7 @@
                 content.innerHTML = `
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
                         <h3 class="font-bold text-lg mb-4">Gelişmiş Raporlar ve Analizler</h3>
-                        <p class="text-slate-400 text-sm">Dernek üyelerinin kan grubu dağılımları, aylık aidat tahsilat trendleri ve operasyonel performans raporları hazır.</p>
+                        <p class="text-slate-400 text-sm">Aylık aidat tahsilat performansları ve operasyonel özet raporları hazır.</p>
                     </div>
                 `;
             } else if (tabName === 'activities') {
@@ -349,12 +339,8 @@
             } else if (tabName === 'api') {
                 content.innerHTML = `
                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-                        <h3 class="font-bold text-lg text-blue-400"><i class="fa-solid fa-code"></i> Mobil Uygulama ve Dış Entegrasyon API</h3>
-                        <p class="text-slate-400 text-sm">Saha ekiplerinin Android/iOS cihazlarından bağlanması için Supabase REST API uç noktaları.</p>
-                        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-xs text-slate-300">
-                            Endpoint: https://iywgxfemglgixjplenyw.supabase.co/rest/v1/<br>
-                            Auth Header: Bearer [SUPABASE_KEY]
-                        </div>
+                        <h3 class="font-bold text-lg text-blue-400"><i class="fa-solid fa-code"></i> Mobil Uygulama & API</h3>
+                        <p class="text-slate-400 text-sm">Supabase REST uç noktaları aktif.</p>
                     </div>
                 `;
             }
@@ -363,11 +349,8 @@
         async function loadDashboardStats() {
             const { data: members } = await supabaseClient.from('members').select('*');
             if (members) {
-                const activeCount = members.filter(m => m.status === 'Aktif').length;
-                const pendingCount = members.filter(m => m.status === 'Onay Bekliyor').length;
-                document.getElementById('stat-active').innerText = activeCount;
-                document.getElementById('stat-pending').innerText = pendingCount;
-                if (pendingCount > 0) document.getElementById('pending-alert-box').classList.remove('hidden');
+                document.getElementById('stat-active').innerText = members.filter(m => m.status === 'Aktif').length;
+                document.getElementById('stat-pending').innerText = members.filter(m => m.status === 'Onay Bekliyor').length;
             }
             const { data: dues } = await supabaseClient.from('dues').select('amount');
             const totalDues = dues ? dues.reduce((sum, d) => sum + (d.amount || 0), 0) : 0;
@@ -416,7 +399,7 @@
             tbody.innerHTML = dues.map(d => `
                 <tr class="border-b border-slate-800/50 hover:bg-slate-800/20">
                     <td class="py-3 font-medium">${d.members?.full_name || 'Üye'}</td>
-                    <td class="py-3">${d.period || '2026'}</td>
+                    <td class="py-3">${d.period || '2026 Sezonu'}</td>
                     <td class="py-3 text-blue-400 font-mono">${d.amount || 0} ₺</td>
                     <td class="py-3"><span class="px-2 py-1 rounded text-xs ${d.status === 'Ödendi' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}">${d.status || 'Ödenmedi'}</span></td>
                     ${isManagement() ? `<td class="py-3"><button onclick="deleteDue('${d.id}')" class="text-red-400 hover:text-red-300 text-xs"><i class="fa-solid fa-trash"></i></button></td>` : ''}
@@ -460,13 +443,18 @@
             `).join('');
         }
 
-        // MODAL (AÇILIR PENCERE) FORMLARI
-        function showAddDueModal() {
+        // MODAL (AÇILIR PENCERE) FORMLARI VE ÜYE LİSTELEME
+        async function showAddDueModal() {
+            const { data: members } = await supabaseClient.from('members').select('id, full_name');
+            const options = members ? members.map(m => `<option value="${m.id}">${m.full_name}</option>`).join('') : '';
+
             openModal("Yeni Aidat Kaydı Ekle", `
                 <form onsubmit="handleAddDue(event)" class="space-y-4">
                     <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Üye ID (Supabase UUID)</label>
-                        <input type="text" id="due-member-id" required placeholder="Üye tablosundan ID kopyalayın" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600">
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Üye Seçin</label>
+                        <select id="due-member-id" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-red-600 text-slate-200">
+                            ${options}
+                        </select>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Aidat Tutarı (₺)</label>
@@ -517,7 +505,7 @@
             `);
         }
 
-        // VERITABANI İŞLEMLERİ
+        // VERİTABANI İŞLEMLERİ
         async function handleAddDue(e) {
             e.preventDefault();
             const member_id = document.getElementById('due-member-id').value;
@@ -590,4 +578,4 @@
         window.onload = checkUserSession;
     </script>
 </body>
-</html> 
+</html>
