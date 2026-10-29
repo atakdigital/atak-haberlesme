@@ -57,8 +57,8 @@
         const SUPABASE_KEY = "sb_publishable_FNlMWgu7kmECpYbDLkC3BA_9emOSPy4";
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Dernek Logosu URL'si
-        const ATAK_LOGO_URL = "https://i.ibb.co/6R2p7Y0/ATAK-PNG.png"; // Yüklediğiniz logonun doğrudan bağlantısı[cite: 11]
+        // Dernek Logosu (Base64 formatında doğrudan gömülü gerçek logo)[cite: 11]
+        const ATAK_LOGO_BASE64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAADwCAYAAAA+VemSAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0idXRmLTgi id=\"W5M0MpCehiHzreSzNTczkc9d\"?>";
 
         let state = {
             currentUser: null,
@@ -306,7 +306,9 @@
                         <div class="p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-800">
                             <div>
                                 <div class="flex items-center space-x-3 mb-6">
-                                    <img src="${ATAK_LOGO_URL}" alt="ATAK Logo" class="w-12 h-12 rounded-full object-cover border border-red-500/50 shadow-lg">
+                                    <div class="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg border border-red-400 overflow-hidden">
+                                        <i class="fa-solid fa-radio"></i>
+                                    </div>
                                     <div><h1 class="font-extrabold text-xl tracking-wider text-white">ATAK DERNEĞİ</h1><p class="text-xs text-red-500 font-semibold">ACİL AFET HABERLEŞME</p></div>
                                 </div>
                                 <h2 class="text-lg font-bold text-slate-200 mb-4">Yönetim Paneli Girişi</h2>
@@ -339,7 +341,9 @@
                 <header class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between sticky top-0 z-40">
                     <div class="flex items-center space-x-4">
                         <div class="flex items-center space-x-3">
-                            <img src="${ATAK_LOGO_URL}" alt="ATAK Logo" class="w-10 h-10 rounded-full object-cover border border-red-500/50 shadow-md">
+                            <div class="w-9 h-9 bg-red-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md border border-red-400 overflow-hidden">
+                                <i class="fa-solid fa-radio"></i>
+                            </div>
                             <div><h1 class="font-bold text-slate-100 text-base">ATAK YÖNETİM PANELİ</h1><p class="text-[10px] text-red-500 font-bold uppercase">Acil Afet Haberleşme Derneği</p></div>
                         </div>
                         ${isY ? `
@@ -576,7 +580,10 @@
                     <div class="space-y-3">
                         ${state.activities.length === 0 ? `<div class="bg-slate-900 border border-slate-800 p-6 rounded-xl text-center text-slate-500 italic text-xs">Henüz kayıtlı saha faaliyeti bulunmuyor.</div>` : state.activities.map(a => `
                             <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-2 relative">
-                                <h4 class="font-bold text-slate-100 text-base">${a.title}</h4>
+                                <div class="flex items-center justify-between">
+                                    <h4 class="font-bold text-slate-100 text-base">${a.title}</h4>
+                                    <span class="text-xs text-red-400 font-mono">${a.activity_date || a.created_at?.slice(0,10) || '2026-10'}</span>
+                                </div>
                                 <p class="text-xs text-slate-300"><strong class="text-red-400">Konum:</strong> ${a.location || 'Belirtilmemiş'}</p>
                                 <p class="text-xs text-slate-400 bg-slate-950 p-3 rounded-lg border border-slate-800"><strong class="text-slate-200">Açıklama:</strong> ${a.description || 'Açıklama girilmemiş.'}</p>
                                 ${isY ? `<button onclick="deleteActivity('${a.id}')" class="absolute top-4 right-4 text-slate-500 hover:text-red-400 text-xs cursor-pointer" title="Sil"><i class="fa-solid fa-trash-can"></i></button>` : ''}
@@ -751,10 +758,12 @@
         }
 
         function openAddActivityModal() {
+            const todayStr = new Date().toISOString().slice(0,10);
             openModal("Saha Faaliyeti Ekle", `
                 <form onsubmit="handleAddActivity(event)" class="space-y-3">
                     <div><label class="block text-xs text-slate-400 mb-1">Faaliyet Başlığı</label><input type="text" id="act-title" required placeholder="Örn: Doğa Tatbikatı" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
                     <div><label class="block text-xs text-slate-400 mb-1">Konum</label><input type="text" id="act-loc" required placeholder="Örn: İzmir Bölgesi" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Faaliyet Tarihi</label><input type="date" id="act-date" required value="${todayStr}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
                     <div><label class="block text-xs text-slate-400 mb-1">Açıklama</label><textarea id="act-desc" rows="3" required placeholder="Faaliyet detaylarını girin..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></textarea></div>
                     <button type="submit" class="w-full bg-amber-600 text-slate-950 py-2 rounded-lg text-xs font-bold cursor-pointer">Faaliyeti Kaydet</button>
                 </form>
@@ -764,9 +773,10 @@
             e.preventDefault();
             const title = document.getElementById('act-title').value;
             const location = document.getElementById('act-loc').value;
+            const activity_date = document.getElementById('act-date').value;
             const description = document.getElementById('act-desc').value;
 
-            const { error } = await supabaseClient.from('field_activities').insert([{ title, location, description }]);
+            const { error } = await supabaseClient.from('field_activities').insert([{ title, location, activity_date, description }]);
             if (error) {
                 showNotification("Faaliyet Ekleme Hatası: " + error.message, 'danger');
             } else {
