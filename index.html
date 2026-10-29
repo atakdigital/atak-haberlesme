@@ -381,7 +381,8 @@
         }
 
         function renderSidebar() {
-            const tabs = [
+            const isY = checkIsYonetim(state.currentUser?.role);
+            let tabs = [
                 { id: 'dashboard', label: 'Genel Bakış', icon: 'fa-chart-pie' },
                 { id: 'users', label: 'Üye Yönetimi', icon: 'fa-users' },
                 { id: 'fees', label: 'Aidat Yönetimi', icon: 'fa-wallet' },
@@ -389,9 +390,14 @@
                 { id: 'radio', label: 'Afet & Telsiz Sahası', icon: 'fa-tower-cell' },
                 { id: 'reports', label: 'Raporlar', icon: 'fa-chart-column' },
                 { id: 'activities', label: 'Saha Faaliyetleri', icon: 'fa-person-hiking' },
-                { id: 'announcements', label: 'Duyurular', icon: 'fa-bullhorn' },
-                { id: 'mobile', label: 'Mobil Uygulama & API', icon: 'fa-mobile-screen-button' }
+                { id: 'announcements', label: 'Duyurular', icon: 'fa-bullhorn' }
             ];
+
+            // Mobil Uygulama & API sekmesini sadece yönetim görebilir
+            if (isY) {
+                tabs.push({ id: 'mobile', label: 'Mobil Uygulama & API', icon: 'fa-mobile-screen-button' });
+            }
+
             return `
                 <aside class="w-full md:w-64 bg-slate-900/70 border-r border-slate-800 flex flex-col shrink-0">
                     <div class="p-4 space-y-1 flex-1">
@@ -624,6 +630,9 @@
         }
 
         function renderMobileSimulatorView() {
+            if (!checkIsYonetim(state.currentUser?.role)) {
+                return `<div class="p-6 text-center text-slate-400 text-xs">Bu sayfaya erişim yetkiniz bulunmamaktadır.</div>`;
+            }
             return `<div class="space-y-6"><h2 class="text-lg font-bold text-slate-100">📱 Mobil Uygulama & API</h2><div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><input type="text" readonly value="https://api.atak.org.tr/v1/mobile-sync" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-emerald-400"></div></div>`;
         }
 
@@ -859,7 +868,14 @@
                 case 'reports': content = renderReportsView(); break;
                 case 'activities': content = renderActivitiesView(); break;
                 case 'announcements': content = renderAnnouncementsView(); break;
-                case 'mobile': content = renderMobileSimulatorView(); break;
+                case 'mobile': 
+                    if (checkIsYonetim(state.currentUser?.role)) {
+                        content = renderMobileSimulatorView(); 
+                    } else {
+                        state.activeTab = 'dashboard';
+                        content = renderDashboardView();
+                    }
+                    break;
                 default: content = renderDashboardView();
             }
 
