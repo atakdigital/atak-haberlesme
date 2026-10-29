@@ -500,12 +500,13 @@
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-xs text-slate-300">
                                 <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
-                                    <tr><th class="px-4 py-3">Gider Adı / Açıklama</th><th class="px-4 py-3">Tutar</th><th class="px-4 py-3">Tarih</th><th class="px-4 py-3 text-right">İşlem</th></tr>
+                                    <tr><th class="px-4 py-3">Gider Adı</th><th class="px-4 py-3">Nereye Ödendi / Açıklama</th><th class="px-4 py-3">Tutar</th><th class="px-4 py-3">Tarih</th><th class="px-4 py-3 text-right">İşlem</th></tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-800">
-                                    ${state.expenses.length === 0 ? `<tr><td colspan="4" class="px-4 py-6 text-center text-slate-500 italic">Henüz kayıtlı dernek gideri bulunmuyor.</td></tr>` : state.expenses.map(e => `
+                                    ${state.expenses.length === 0 ? `<tr><td colspan="5" class="px-4 py-6 text-center text-slate-500 italic">Henüz kayıtlı dernek gideri bulunmuyor.</td></tr>` : state.expenses.map(e => `
                                         <tr class="hover:bg-slate-800/50">
                                             <td class="px-4 py-3 font-semibold text-slate-100">${e.title}</td>
+                                            <td class="px-4 py-3 text-slate-300">${e.paid_to || '-'}</td>
                                             <td class="px-4 py-3 text-red-400 font-bold">₺${e.amount}</td>
                                             <td class="px-4 py-3 text-slate-400">${e.date || '2026-10'}</td>
                                             <td class="px-4 py-3 text-right"><button onclick="deleteExpense('${e.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></td>
@@ -693,7 +694,8 @@
         function openAddExpenseModal() {
             openModal("Dernek Gideri Ekle", `
                 <form onsubmit="handleAddExpense(event)" class="space-y-3">
-                    <div><label class="block text-xs text-slate-400 mb-1">Gider Adı / Açıklama</label><input type="text" id="exp-title" required placeholder="Örn: Elektrik Faturası / Telsiz Bakımı" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Gider Adı</label><input type="text" id="exp-title" required placeholder="Örn: Elektrik Faturası" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Nereye Ödendi / Açıklama</label><input type="text" id="exp-paid" required placeholder="Örn: GDZ Elektrik A.Ş." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
                     <div><label class="block text-xs text-slate-400 mb-1">Tutar (₺)</label><input type="number" id="exp-amount" required placeholder="1250" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
                     <button type="submit" class="w-full bg-red-600 hover:bg-red-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Gideri Kaydet</button>
                 </form>
@@ -703,9 +705,10 @@
         async function handleAddExpense(e) {
             e.preventDefault();
             const title = document.getElementById('exp-title').value;
+            const paid_to = document.getElementById('exp-paid').value;
             const amount = parseFloat(document.getElementById('exp-amount').value);
 
-            const { error } = await supabaseClient.from('expenses').insert([{ title, amount, date: new Date().toISOString().slice(0,10) }]);
+            const { error } = await supabaseClient.from('expenses').insert([{ title, paid_to, amount, date: new Date().toISOString().slice(0,10) }]);
             if (error) {
                 showNotification("Gider Ekleme Hatası: " + error.message, 'danger');
             } else {
