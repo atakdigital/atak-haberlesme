@@ -136,7 +136,7 @@
                 const [mRes, dRes, expRes, aRes, rRes, repRes, repPortRes, sysRes] = await Promise.all([
                     supabaseClient.from('members').select('*'),
                     supabaseClient.from('dues').select('*, members(full_name)'),
-                    supabaseClient.from('expenses').select('*').catch(() => ({ data: [] })),
+                    supabaseClient.from('expenses').select('*'),
                     supabaseClient.from('announcements').select('*'),
                     supabaseClient.from('field_activities').select('*'),
                     supabaseClient.from('repeaters').select('*'),
@@ -836,7 +836,7 @@
                 if (ctxBlood) {
                     const counts = {};
                     state.users.forEach(u => { const b = u.blood || '0 Rh+'; counts[b] = (counts[b] || 0) + 1; });
-                    new Chart(ctxBlood, { type: 'doughnut', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#DC2626', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#6366F1'] }] }, options: { responsive: ç = true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94A3B8' } } } } });
+                    new Chart(ctxBlood, { type: 'doughnut', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#DC2626', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#6366F1'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94A3B8' } } } } });
                 }
                 const ctxFee = document.getElementById('chartFeeTrend');
                 if (ctxFee) {
