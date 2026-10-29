@@ -727,7 +727,14 @@
         }
 
         window.approveMember = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('members').update({ status: 'Aktif' }).eq('id', id); await fetchAllData(); render(); } };
-        window.deleteMember = async (id) => { if(checkIsYonetim(state.currentUser?.role) && confirm("Silmek istediğinize emin misiniz?")) { await supabaseClient.from('members').delete().eq('id', id); await fetchAllData(); render(); } };
+        window.deleteMember = async (id) => { 
+            if(checkIsYonetim(state.currentUser?.role)) { 
+                await supabaseClient.from('members').delete().eq('id', id); 
+                await fetchAllData(); 
+                render(); 
+                showNotification("Üye sistemden silindi.", "info");
+            } 
+        };
         window.deleteDue = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('dues').delete().eq('id', id); await fetchAllData(); render(); } };
         window.deleteRepeater = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('repeaters').delete().eq('id', id); await fetchAllData(); render(); } };
         window.deleteReport = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('reports').delete().eq('id', id); await fetchAllData(); render(); } };
