@@ -97,6 +97,7 @@
         };
 
         let alarmInterval = null;
+        let globalAudioCtx = null;
 
         function checkIsYonetim(roleStr) {
             const role = roleStr || (state.currentUser ? state.currentUser.role : '');
@@ -121,37 +122,45 @@
             setTimeout(() => { state.notification = null; render(); }, 3500);
         }
 
-        function playSingleAlarmBeep() {
+        async function playSingleAlarmBeep() {
             try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
+                if (!globalAudioCtx) {
+                    globalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (globalAudioCtx.state === 'suspended') {
+                    await globalAudioCtx.resume();
+                }
+
+                const oscillator = globalAudioCtx.createOscillator();
+                const gainNode = globalAudioCtx.createGain();
 
                 oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
-                oscillator.frequency.setValueAtTime(440, audioCtx.currentTime + 0.3);
-                gainNode.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                oscillator.frequency.setValueAtTime(880, globalAudioCtx.currentTime);
+                oscillator.frequency.setValueAtTime(440, globalAudioCtx.currentTime + 0.3);
+                gainNode.gain.setValueAtTime(0.3, globalAudioCtx.currentTime);
 
                 oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
+                gainNode.connect(globalAudioCtx.destination);
 
                 oscillator.start();
-                oscillator.stop(audioCtx.currentTime + 0.8);
+                oscillator.stop(globalAudioCtx.currentTime + 0.8);
             } catch (e) {
-                console.log("Ses çalınamadı:", e);
+                console.log("Ses çalma kısıtlaması:", e);
             }
         }
 
         function startRepeatingAlarm() {
             stopRepeatingAlarm();
-            playSingleAlarmBeep();
-            alarmInterval = setInterval(() => {
-                if (state.disasterMode && (!state.userAcknowledgedDisaster || checkIsYonetim(state.currentUser?.role))) {
-                    playSingleAlarmBeep();
-                } else {
-                    stopRepeatingAlarm();
-                }
-            }, 2500);
+            if (!state.userAcknowledgedDisaster) {
+                playSingleAlarmBeep();
+                alarmInterval = setInterval(() => {
+                    if (state.disasterMode && !state.userAcknowledgedDisaster) {
+                        playSingleAlarmBeep();
+                    } else {
+                        stopRepeatingAlarm();
+                    }
+                }, 2500);
+            }
         }
 
         function stopRepeatingAlarm() {
@@ -266,11 +275,11 @@
             render();
         }
 
-        function acknowledgeDisaster() {
+        window.acknowledgeDisaster = function() {
             state.userAcknowledgedDisaster = true;
             stopRepeatingAlarm();
             render();
-        }
+        };
 
         async function handleLogin(e) {
             e.preventDefault();
@@ -338,10 +347,11 @@
 
         function renderGlobalDisasterModal() {
             if (!state.disasterMode || !state.currentUser) return '';
-            const isY = checkIsYonetim(state.currentUser?.role);
             
-            // Eğer yönetimse ve alarmı kapatmadıysa veya üyeyse ve onaylamadıysa modalı göster
-            if (!isY && state.userAcknowledgedDisaster) return '';
+            // Kullanıcı butona bastıysa ekranı gösterilmez yap
+            if (state.userAcknowledgedDisaster) return '';
+
+            const isY = checkIsYonetim(state.currentUser?.role);
 
             return `
                 <div class="fixed inset-0 bg-red-950/90 z-50 flex items-center justify-center p-6 backdrop-blur-md disaster-pulse">
@@ -358,8 +368,8 @@
                             AKTİF ÇAĞRI KANALI: 439.2625 MHz / SAHA FREKANSI: 433.475 MHz
                         </div>
                         
-                        <!-- KESİNLİKLE GÖRÜNECEK TAMAM BUTONU -->
-                        <button onclick="acknowledgeDisaster()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-red-600/50 cursor-pointer flex items-center justify-center space-x-2">
+                        <!-- TAMAM BUTONU (HEM YÖNETİCİ HEM ÜYE İÇİN ÇALIŞIR) -->
+                        <button onclick="window.acknowledgeDisaster()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3.5 rounded-xl text-sm transition shadow-lg shadow-red-600/50 cursor-pointer flex items-center justify-center space-x-2">
                             <i class="fa-solid fa-check-circle"></i><span>Anladım / Tamam (Sesi Sustur)</span>
                         </button>
 
