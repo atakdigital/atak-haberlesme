@@ -71,12 +71,21 @@
             notification: null
         };
 
-        // KESİN YETKİ KONTROLÜ (İçinde yönetim kelimesi geçmeyen herkes normal üyedir)
         function checkIsYonetim(roleStr) {
-            if (!roleStr) return false;
-            const r = roleStr.toLowerCase().trim();
-            const managementKeywords = ['yönetim', 'baskan', 'başkan', 'sekreter', 'sayman', 'admin', 'yonetim'];
-            return managementKeywords.some(keyword => r.includes(keyword));
+            const role = roleStr || (state.currentUser ? state.currentUser.role : '');
+            if (!role) return false;
+            const r = role.toString().trim()
+                .replace(/İ/g, 'i').replace(/I/g, 'ı')
+                .replace(/Ğ/g, 'g').replace(/Ü/g, 'u')
+                .replace(/Ş/g, 's').replace(/Ö/g, 'o')
+                .replace(/Ç/g, 'c').toLowerCase();
+
+            if (r === 'normal üye' || r === 'normal uye' || r === 'uye' || r === 'üye' || r === 'normal') {
+                return false;
+            }
+
+            const managementKeywords = ['baskan', 'sekreter', 'sayman', 'yonetim', 'admin', 'kurul'];
+            return managementKeywords.some(key => r.includes(key));
         }
 
         function showNotification(msg, type = 'success') {
@@ -112,7 +121,7 @@
                 if (member) {
                     state.currentUser = member;
                 } else {
-                    state.currentUser = { id: session.user.id, full_name: session.user.email, role: 'Normal Üye', callsign: 'TA1XXX' };
+                    state.currentUser = { id: session.user.id, email: session.user.email, full_name: session.user.email, role: 'Normal Üye', callsign: 'TA1XXX' };
                 }
             } else {
                 state.currentUser = null;
@@ -123,37 +132,41 @@
         }
 
         async function fetchAllData() {
-            const [mRes, dRes, expRes, aRes, rRes, repRes, repPortRes, sysRes] = await Promise.all([
-                supabaseClient.from('members').select('*'),
-                supabaseClient.from('dues').select('*, members(full_name)'),
-                supabaseClient.from('expenses').select('*').catch(() => ({ data: [] })),
-                supabaseClient.from('announcements').select('*'),
-                supabaseClient.from('field_activities').select('*'),
-                supabaseClient.from('repeaters').select('*'),
-                supabaseClient.from('reports').select('*'),
-                supabaseClient.from('system_settings').select('*').eq('key', 'disaster_mode').single()
-            ]);
+            try {
+                const [mRes, dRes, expRes, aRes, rRes, repRes, repPortRes, sysRes] = await Promise.all([
+                    supabaseClient.from('members').select('*'),
+                    supabaseClient.from('dues').select('*, members(full_name)'),
+                    supabaseClient.from('expenses').select('*'),
+                    supabaseClient.from('announcements').select('*'),
+                    supabaseClient.from('field_activities').select('*'),
+                    supabaseClient.from('repeaters').select('*'),
+                    supabaseClient.from('reports').select('*'),
+                    supabaseClient.from('system_settings').select('*').eq('key', 'disaster_mode').single()
+                ]);
 
-            if (mRes.data) state.users = mRes.data;
-            if (dRes.data) state.fees = dRes.data.map(d => ({
-                id: d.id,
-                memberName: d.members?.full_name || 'Üye',
-                amount: d.amount,
-                month: d.month || 'Ocak',
-                year: d.year || 2026,
-                status: d.status || 'Ödendi'
-            }));
-            if (expRes.data) state.expenses = expRes.data;
-            if (aRes.data) state.announcements = aRes.data;
-            if (rRes.data) state.activities = rRes.data;
-            if (repRes.data) state.repeaters = repRes.data;
-            if (repPortRes.data) state.reports = repPortRes.data;
-            
-            const prevDisasterState = state.disasterMode;
-            if (sysRes.data) state.disasterMode = sysRes.data.value === 'true';
+                if (mRes.data) state.users = mRes.data;
+                if (dRes.data) state.fees = dRes.data.map(d => ({
+                    id: d.id,
+                    memberName: d.members?.full_name || 'Üye',
+                    amount: d.amount,
+                    month: d.month || 'Ocak',
+                    year: d.year || 2026,
+                    status: d.status || 'Ödendi'
+                }));
+                if (expRes.data) state.expenses = expRes.data;
+                if (aRes.data) state.announcements = aRes.data;
+                if (rRes.data) state.activities = rRes.data;
+                if (repRes.data) state.repeaters = repRes.data;
+                if (repPortRes.data) state.reports = repPortRes.data;
+                
+                const prevDisasterState = state.disasterMode;
+                if (sysRes.data) state.disasterMode = sysRes.data.value === 'true';
 
-            if (!prevDisasterState && state.disasterMode) {
-                playDisasterAlarmSound();
+                if (!prevDisasterState && state.disasterMode) {
+                    playDisasterAlarmSound();
+                }
+            } catch (err) {
+                console.error("Veri çekme hatası:", err);
             }
         }
 
@@ -182,10 +195,6 @@
         }
 
         async function toggleDisasterMode() {
-            if (!checkIsYonetim(state.currentUser?.role)) {
-                showNotification("Bu işlem için yetkiniz yok! Yalnızca Yönetim Kurulu tetikleyebilir.", 'danger');
-                return;
-            }
             const newStatus = !state.disasterMode;
             await supabaseClient.from('system_settings').upsert({ key: 'disaster_mode', value: newStatus ? 'true' : 'false' });
             
@@ -258,8 +267,10 @@
         }
 
         function renderGlobalDisasterModal() {
-            if (!state.disasterMode) return '';
+            if (!state.disasterMode || !state.currentUser) return '';
             const isY = checkIsYonetim(state.currentUser?.role);
+            if (isY) return '';
+
             return `
                 <div class="fixed inset-0 bg-red-950/90 z-50 flex items-center justify-center p-6 backdrop-blur-md disaster-pulse">
                     <div class="bg-slate-950 border-4 border-red-600 rounded-3xl p-8 max-w-xl w-full text-center space-y-6 shadow-2xl shadow-red-600/50">
@@ -274,13 +285,7 @@
                         <div class="p-4 bg-red-950/60 border border-red-800 rounded-xl text-red-300 text-xs font-mono font-bold">
                             AKTİF ÇAĞRI KANALI: 439.2625 MHz / SAHA FREKANSI: 433.475 MHz
                         </div>
-                        ${isY ? `
-                            <button onclick="toggleDisasterMode()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer">
-                                Afet Modunu Kapat (Yönetim Yetkisi)
-                            </button>
-                        ` : `
-                            <div class="text-[11px] text-slate-500 italic">Bu uyarı merkezi sunucudan anlık olarak iletilmiştir.</div>
-                        `}
+                        <div class="text-[11px] text-slate-500 italic">Bu uyarı merkezi sunucudan anlık olarak iletilmiştir.</div>
                     </div>
                 </div>
             `;
@@ -321,7 +326,7 @@
         }
 
         function renderHeader() {
-            const isY = checkIsYonetim(state.currentUser.role);
+            const isY = checkIsYonetim(state.currentUser?.role);
             return `
                 <header class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between sticky top-0 z-40">
                     <div class="flex items-center space-x-4">
@@ -788,7 +793,10 @@
 
         function render() {
             const root = document.getElementById('app');
-            if (!state.currentUser) { root.innerHTML = renderAuthScreen() + renderNotification() + renderGlobalDisasterModal(); return; }
+            if (!state.currentUser) { 
+                root.innerHTML = renderAuthScreen() + renderNotification() + renderGlobalDisasterModal(); 
+                return; 
+            }
 
             let content = '';
             switch(state.activeTab) {
