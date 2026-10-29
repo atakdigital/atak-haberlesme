@@ -61,6 +61,7 @@
             currentUser: null,
             users: [],
             fees: [],
+            expenses: [],
             announcements: [],
             activities: [],
             repeaters: [],
@@ -132,9 +133,10 @@
 
         async function fetchAllData() {
             try {
-                const [mRes, dRes, aRes, rRes, repRes, repPortRes, sysRes] = await Promise.all([
+                const [mRes, dRes, expRes, aRes, rRes, repRes, repPortRes, sysRes] = await Promise.all([
                     supabaseClient.from('members').select('*'),
                     supabaseClient.from('dues').select('*, members(full_name)'),
+                    supabaseClient.from('expenses').select('*').catch(() => ({ data: [] })),
                     supabaseClient.from('announcements').select('*'),
                     supabaseClient.from('field_activities').select('*'),
                     supabaseClient.from('repeaters').select('*'),
@@ -151,6 +153,7 @@
                     year: d.year || 2026,
                     status: d.status || 'Ödendi'
                 }));
+                if (expRes.data) state.expenses = expRes.data;
                 if (aRes.data) state.announcements = aRes.data;
                 if (rRes.data) state.activities = rRes.data;
                 if (repRes.data) state.repeaters = repRes.data;
@@ -170,7 +173,7 @@
         function initRealtimeListener() {
             const channel = supabaseClient.channel('db-changes');
 
-            ['members', 'dues', 'field_activities', 'announcements', 'system_settings', 'repeaters', 'reports'].forEach(tableName => {
+            ['members', 'dues', 'expenses', 'field_activities', 'announcements', 'system_settings', 'repeaters', 'reports'].forEach(tableName => {
                 channel.on(
                     'postgres_changes',
                     { event: '*', schema: 'public', table: tableName },
@@ -358,6 +361,7 @@
                 { id: 'dashboard', label: 'Genel Bakış', icon: 'fa-chart-pie' },
                 { id: 'users', label: 'Üye Yönetimi', icon: 'fa-users' },
                 { id: 'fees', label: 'Aidat Yönetimi', icon: 'fa-wallet' },
+                { id: 'expenses', label: 'Dernek Giderleri', icon: 'fa-file-invoice-dollar' },
                 { id: 'radio', label: 'Afet & Telsiz Sahası', icon: 'fa-tower-cell' },
                 { id: 'reports', label: 'Raporlar', icon: 'fa-chart-column' },
                 { id: 'activities', label: 'Saha Faaliyetleri', icon: 'fa-person-hiking' },
@@ -441,30 +445,6 @@
         }
 
         function renderFeesView() {
-            const isY = checkIsYonetim(state.currentUser?.role);
-
-            if (!isY) {
-                return `
-                    <div class="space-y-6">
-                        <div>
-                            <h2 class="text-lg font-bold text-slate-100">💰 Aylık Aidat Yönetimi</h2>
-                            <p class="text-xs text-slate-400">Üye aidat ödemelerinin takibi</p>
-                        </div>
-                        <div class="bg-slate-900 border border-red-900/50 p-12 rounded-2xl text-center space-y-4 shadow-xl">
-                            <div class="w-16 h-16 bg-red-950/80 text-red-500 border border-red-800 rounded-full flex items-center justify-center mx-auto text-3xl">
-                                <i class="fa-solid fa-lock"></i>
-                            </div>
-                            <div class="space-y-1">
-                                <h3 class="text-lg font-bold text-slate-100">Erişim Yetkisi Sınırlı</h3>
-                                <p class="text-xs text-slate-400 max-w-md mx-auto">
-                                    Bu modülü ve mali kayıtları görüntüleme, düzenleme veya işlem yapma yetkiniz bulunmamaktadır. Yalnızca <strong>Yönetim Kurulu</strong> üyeleri erişebilir.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-
             return `
                 <div class="space-y-8">
                     <div class="flex items-center justify-between">
@@ -491,6 +471,44 @@
                                             <td class="px-4 py-3 text-emerald-400 font-bold">₺${f.amount}</td>
                                             <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400">Ödendi</span></td>
                                             <td class="px-4 py-3 text-right"><button onclick="deleteDue('${f.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderExpensesView() {
+            const totalExpenses = state.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+            return `
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-100">📋 Dernek Giderleri</h2>
+                            <p class="text-xs text-slate-400">Dernek masrafları ve faturaların takibi</p>
+                        </div>
+                        <button onclick="openAddExpenseModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Gider Ekle</button>
+                    </div>
+                    <div class="flex items-center justify-between bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                        <span class="text-xs text-slate-300 font-semibold">Toplam Dernek Gideri:</span>
+                        <span class="text-base text-red-400 font-bold">₺${totalExpenses.toLocaleString()}</span>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs text-slate-300">
+                                <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
+                                    <tr><th class="px-4 py-3">Gider Adı / Açıklama</th><th class="px-4 py-3">Tutar</th><th class="px-4 py-3">Tarih</th><th class="px-4 py-3 text-right">İşlem</th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-800">
+                                    ${state.expenses.length === 0 ? `<tr><td colspan="4" class="px-4 py-6 text-center text-slate-500 italic">Henüz kayıtlı dernek gideri bulunmuyor.</td></tr>` : state.expenses.map(e => `
+                                        <tr class="hover:bg-slate-800/50">
+                                            <td class="px-4 py-3 font-semibold text-slate-100">${e.title}</td>
+                                            <td class="px-4 py-3 text-red-400 font-bold">₺${e.amount}</td>
+                                            <td class="px-4 py-3 text-slate-400">${e.date || '2026-10'}</td>
+                                            <td class="px-4 py-3 text-right"><button onclick="deleteExpense('${e.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -672,6 +690,32 @@
             }
         }
 
+        function openAddExpenseModal() {
+            openModal("Dernek Gideri Ekle", `
+                <form onsubmit="handleAddExpense(event)" class="space-y-3">
+                    <div><label class="block text-xs text-slate-400 mb-1">Gider Adı / Açıklama</label><input type="text" id="exp-title" required placeholder="Örn: Elektrik Faturası / Telsiz Bakımı" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Tutar (₺)</label><input type="number" id="exp-amount" required placeholder="1250" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Gideri Kaydet</button>
+                </form>
+            `);
+        }
+
+        async function handleAddExpense(e) {
+            e.preventDefault();
+            const title = document.getElementById('exp-title').value;
+            const amount = parseFloat(document.getElementById('exp-amount').value);
+
+            const { error } = await supabaseClient.from('expenses').insert([{ title, amount, date: new Date().toISOString().slice(0,10) }]);
+            if (error) {
+                showNotification("Gider Ekleme Hatası: " + error.message, 'danger');
+            } else {
+                showNotification("Dernek gideri başarıyla eklendi.");
+                closeModal();
+                await fetchAllData();
+                render();
+            }
+        }
+
         function openAddRepeaterModal() {
             openModal("Röle Ekle", `<form onsubmit="handleAddRepeater(event)" class="space-y-3"><input type="text" id="rpt-name" required placeholder="Röle Adı" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><input type="text" id="rpt-freq" required placeholder="Frekans" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><button type="submit" class="w-full bg-red-600 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button></form>`);
         }
@@ -728,14 +772,17 @@
 
         window.approveMember = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('members').update({ status: 'Aktif' }).eq('id', id); await fetchAllData(); render(); } };
         window.deleteMember = async (id) => { 
-            if(checkIsYonetim(state.currentUser?.role)) { 
-                await supabaseClient.from('members').delete().eq('id', id); 
+            const { error } = await supabaseClient.from('members').delete().eq('id', id);
+            if (error) {
+                showNotification("Silme Hatası: " + error.message, "danger");
+            } else {
                 await fetchAllData(); 
                 render(); 
                 showNotification("Üye sistemden silindi.", "info");
-            } 
+            }
         };
         window.deleteDue = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('dues').delete().eq('id', id); await fetchAllData(); render(); } };
+        window.deleteExpense = async (id) => { await supabaseClient.from('expenses').delete().eq('id', id); await fetchAllData(); render(); showNotification("Gider silindi.", "info"); };
         window.deleteRepeater = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('repeaters').delete().eq('id', id); await fetchAllData(); render(); } };
         window.deleteReport = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('reports').delete().eq('id', id); await fetchAllData(); render(); } };
         window.deleteActivity = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('field_activities').delete().eq('id', id); await fetchAllData(); render(); } };
@@ -753,6 +800,7 @@
                 case 'dashboard': content = renderDashboardView(); break;
                 case 'users': content = renderUsersView(); break;
                 case 'fees': content = renderFeesView(); break;
+                case 'expenses': content = renderExpensesView(); break;
                 case 'radio': content = renderRadioView(); break;
                 case 'reports': content = renderReportsView(); break;
                 case 'activities': content = renderActivitiesView(); break;
@@ -788,7 +836,7 @@
                 if (ctxBlood) {
                     const counts = {};
                     state.users.forEach(u => { const b = u.blood || '0 Rh+'; counts[b] = (counts[b] || 0) + 1; });
-                    new Chart(ctxBlood, { type: 'doughnut', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#DC2626', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#6366F1'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94A3B8' } } } } });
+                    new Chart(ctxBlood, { type: 'doughnut', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#DC2626', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#6366F1'] }] }, options: { responsive: ç = true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94A3B8' } } } } });
                 }
                 const ctxFee = document.getElementById('chartFeeTrend');
                 if (ctxFee) {
