@@ -91,9 +91,12 @@
             repeaters: [],
             reports: [],
             disasterMode: false,
+            userAcknowledgedDisaster: false, // Üyenin kendi ekranında alarmı kapatıp kapatmadığı
             activeTab: 'dashboard',
             notification: null
         };
+
+        let alarmInterval = null;
 
         function checkIsYonetim(roleStr) {
             const role = roleStr || (state.currentUser ? state.currentUser.role : '');
@@ -118,7 +121,7 @@
             setTimeout(() => { state.notification = null; render(); }, 3500);
         }
 
-        function playDisasterAlarmSound() {
+        function playSingleAlarmBeep() {
             try {
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 const oscillator = audioCtx.createOscillator();
@@ -126,15 +129,35 @@
 
                 oscillator.type = 'sine';
                 oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
-                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                oscillator.frequency.setValueAtTime(440, audioCtx.currentTime + 0.3);
+                gainNode.gain.setValueAtTime(0.4, audioCtx.currentTime);
 
                 oscillator.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
 
                 oscillator.start();
-                oscillator.stop(audioCtx.currentTime + 1.5);
+                oscillator.stop(audioCtx.currentTime + 0.8);
             } catch (e) {
                 console.log("Ses çalınamadı:", e);
+            }
+        }
+
+        function startRepeatingAlarm() {
+            stopRepeatingAlarm();
+            playSingleAlarmBeep();
+            alarmInterval = setInterval(() => {
+                if (state.disasterMode && (!state.userAcknowledgedDisaster || checkIsYonetim(state.currentUser?.role))) {
+                    playSingleAlarmBeep();
+                } else {
+                    stopRepeatingAlarm();
+                }
+            }, 2500);
+        }
+
+        function stopRepeatingAlarm() {
+            if (alarmInterval) {
+                clearInterval(alarmInterval);
+                alarmInterval = null;
             }
         }
 
@@ -187,7 +210,11 @@
                 if (sysRes.data) state.disasterMode = sysRes.data.value === 'true';
 
                 if (!prevDisasterState && state.disasterMode) {
-                    playDisasterAlarmSound();
+                    state.userAcknowledgedDisaster = false; // Yeni alarm tetiklendiğinde üyenin onayını sıfırla
+                    startRepeatingAlarm();
+                } else if (!state.disasterMode) {
+                    stopRepeatingAlarm();
+                    state.userAcknowledgedDisaster = false;
                 }
             } catch (err) {
                 console.error("Veri çekme hatası:", err);
@@ -205,7 +232,11 @@
                         if (tableName === 'system_settings' && payload.new && payload.new.key === 'disaster_mode') {
                             const newStatus = payload.new.value === 'true';
                             if (!state.disasterMode && newStatus) {
-                                playDisasterAlarmSound();
+                                state.userAcknowledgedDisaster = false;
+                                startRepeatingAlarm();
+                            } else if (!newStatus) {
+                                stopRepeatingAlarm();
+                                state.userAcknowledgedDisaster = false;
                             }
                             state.disasterMode = newStatus;
                         }
@@ -224,11 +255,20 @@
             
             state.disasterMode = newStatus;
             if (state.disasterMode) {
-                playDisasterAlarmSound();
+                state.userAcknowledgedDisaster = false;
+                startRepeatingAlarm();
                 showNotification('🚨 Kırmızı Alarm! Tüm kullanıcılara afet sinyali gönderildi.', 'danger');
             } else {
-                showNotification('Afet modu kapatıldı.', 'info');
+                stopRepeatingAlarm();
+                state.userAcknowledgedDisaster = false;
+                showNotification('Afet modu tamamen kapatıldı.', 'info');
             }
+            render();
+        }
+
+        function acknowledgeDisaster() {
+            state.userAcknowledgedDisaster = true;
+            stopRepeatingAlarm();
             render();
         }
 
@@ -279,6 +319,7 @@
         }
 
         async function handleLogout() {
+            stopRepeatingAlarm();
             await supabaseClient.auth.signOut();
             state.currentUser = null;
             render();
@@ -298,7 +339,9 @@
         function renderGlobalDisasterModal() {
             if (!state.disasterMode || !state.currentUser) return '';
             const isY = checkIsYonetim(state.currentUser?.role);
-            if (isY) return '';
+            
+            // Eğer yetkiliyse veya üye henüz "Tamam" demediyse modalı göster
+            if (!isY && state.userAcknowledgedDisaster) return '';
 
             return `
                 <div class="fixed inset-0 bg-red-950/90 z-50 flex items-center justify-center p-6 backdrop-blur-md disaster-pulse">
@@ -314,6 +357,13 @@
                         <div class="p-4 bg-red-950/60 border border-red-800 rounded-xl text-red-300 text-xs font-mono font-bold">
                             AKTİF ÇAĞRI KANALI: 439.2625 MHz / SAHA FREKANSI: 433.475 MHz
                         </div>
+                        ${!isY ? `
+                            <button onclick="acknowledgeDisaster()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl text-sm transition shadow-lg shadow-red-600/50 cursor-pointer flex items-center justify-center space-x-2">
+                                <i class="fa-solid fa-check-circle"></i><span>Anladım / Tamam (Sesi Sustur)</span>
+                            </button>
+                        ` : `
+                            <div class="text-xs text-amber-400 font-semibold italic">Yönetici olarak bu alarmı tamamen kapatmak için üst menüdeki "AFET MODU AKTİF (KAPAT)" butonunu kullanabilirsiniz.</div>
+                        `}
                         <div class="text-[11px] text-slate-500 italic">Bu uyarı merkezi sunucudan anlık olarak iletilmiştir.</div>
                     </div>
                 </div>
@@ -393,7 +443,6 @@
                 { id: 'announcements', label: 'Duyurular', icon: 'fa-bullhorn' }
             ];
 
-            // Mobil Uygulama & API sekmesini sadece yönetim görebilir
             if (isY) {
                 tabs.push({ id: 'mobile', label: 'Mobil Uygulama & API', icon: 'fa-mobile-screen-button' });
             }
