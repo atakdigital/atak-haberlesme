@@ -347,8 +347,6 @@
 
         function renderGlobalDisasterModal() {
             if (!state.disasterMode || !state.currentUser) return '';
-            
-            // Kullanıcı butona bastıysa ekranı gösterilmez yap
             if (state.userAcknowledgedDisaster) return '';
 
             const isY = checkIsYonetim(state.currentUser?.role);
@@ -368,7 +366,6 @@
                             AKTİF ÇAĞRI KANALI: 439.2625 MHz / SAHA FREKANSI: 433.475 MHz
                         </div>
                         
-                        <!-- TAMAM BUTONU (HEM YÖNETİCİ HEM ÜYE İÇİN ÇALIŞIR) -->
                         <button onclick="window.acknowledgeDisaster()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3.5 rounded-xl text-sm transition shadow-lg shadow-red-600/50 cursor-pointer flex items-center justify-center space-x-2">
                             <i class="fa-solid fa-check-circle"></i><span>Anladım / Tamam (Sesi Sustur)</span>
                         </button>
@@ -492,7 +489,15 @@
                     </div>
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><h4 class="font-bold text-slate-200 text-sm mb-4">Üye Kan Grubu Dağılımı</h4><div class="h-64 flex items-center justify-center"><canvas id="chartBloodGroup"></canvas></div></div>
-                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><h4 class="font-bold text-slate-200 text-sm mb-4">Aylık Aidat Tahsilat Trendi</h4><div class="h-64 flex items-center justify-center"><canvas id="chartFeeTrend"></canvas></div></div>
+                        ${isY ? `
+                            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><h4 class="font-bold text-slate-200 text-sm mb-4">Gerçek Zamanlı Aylık Aidat Tahsilat Trendi</h4><div class="h-64 flex items-center justify-center"><canvas id="chartFeeTrend"></canvas></div></div>
+                        ` : `
+                            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col items-center justify-center text-center">
+                                <i class="fa-solid fa-shield-halved text-4xl text-slate-600 mb-3"></i>
+                                <h4 class="font-bold text-slate-300 text-sm">Finansal Analiz ve Grafikler</h4>
+                                <p class="text-xs text-slate-500 mt-1">Bu bölüm güvenlik politikası gereği yalnızca dernek yönetim yetkilileri tarafından görüntülenebilir.</p>
+                            </div>
+                        `}
                     </div>
                 </div>
             `;
@@ -537,6 +542,9 @@
         }
 
         function renderFeesView() {
+            if (!checkIsYonetim(state.currentUser?.role)) {
+                return `<div class="bg-slate-900 border border-slate-800 p-8 rounded-xl text-center space-y-3"><i class="fa-solid fa-triangle-exclamation text-3xl text-amber-500"></i><h3 class="text-base font-bold text-slate-100">Yetkisiz Erişim</h3><p class="text-xs text-slate-400">Bu sayfayı görüntüleme yetkiniz bulunmamaktadır.</p></div>`;
+            }
             return `
                 <div class="space-y-8">
                     <div class="flex items-center justify-between">
@@ -574,6 +582,9 @@
         }
 
         function renderExpensesView() {
+            if (!checkIsYonetim(state.currentUser?.role)) {
+                return `<div class="bg-slate-900 border border-slate-800 p-8 rounded-xl text-center space-y-3"><i class="fa-solid fa-triangle-exclamation text-3xl text-amber-500"></i><h3 class="text-base font-bold text-slate-100">Yetkisiz Erişim</h3><p class="text-xs text-slate-400">Bu sayfayı görüntüleme yetkiniz bulunmamaktadır.</p></div>`;
+            }
             const totalExpenses = state.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
             return `
                 <div class="space-y-6">
@@ -693,7 +704,7 @@
 
         function renderMobileSimulatorView() {
             if (!checkIsYonetim(state.currentUser?.role)) {
-                return `<div class="p-6 text-center text-slate-400 text-xs">Bu sayfaya erişim yetkiniz bulunmamaktadır.</div>`;
+                return `<div class="bg-slate-900 border border-slate-800 p-8 rounded-xl text-center space-y-3"><i class="fa-solid fa-triangle-exclamation text-3xl text-amber-500"></i><h3 class="text-base font-bold text-slate-100">Yetkisiz Erişim</h3><p class="text-xs text-slate-400">Bu sayfayı görüntüleme yetkiniz bulunmamaktadır.</p></div>`;
             }
             return `<div class="space-y-6"><h2 class="text-lg font-bold text-slate-100">📱 Mobil Uygulama & API</h2><div class="bg-slate-900 border border-slate-800 p-5 rounded-xl"><input type="text" readonly value="https://api.atak.org.tr/v1/mobile-sync" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-emerald-400"></div></div>`;
         }
@@ -743,6 +754,7 @@
         }
 
         async function openAddDueModal() {
+            if (!checkIsYonetim(state.currentUser?.role)) return;
             const { data: members } = await supabaseClient.from('members').select('id, full_name');
             const opts = members ? members.map(m => `<option value="${m.id}">${m.full_name}</option>`).join('') : '';
             const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
@@ -776,6 +788,7 @@
 
         async function handleAddDue(e) {
             e.preventDefault();
+            if (!checkIsYonetim(state.currentUser?.role)) return;
             const member_id = document.getElementById('due-member').value;
             const month = document.getElementById('due-month').value;
             const year = parseInt(document.getElementById('due-year').value);
@@ -793,6 +806,7 @@
         }
 
         function openAddExpenseModal() {
+            if (!checkIsYonetim(state.currentUser?.role)) return;
             openModal("Dernek Gideri Ekle", `
                 <form onsubmit="handleAddExpense(event)" class="space-y-3">
                     <div><label class="block text-xs text-slate-400 mb-1">Gider Adı</label><input type="text" id="exp-title" required placeholder="Örn: Elektrik Faturası" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
@@ -805,6 +819,7 @@
 
         async function handleAddExpense(e) {
             e.preventDefault();
+            if (!checkIsYonetim(state.currentUser?.role)) return;
             const title = document.getElementById('exp-title').value;
             const paid_to = document.getElementById('exp-paid').value;
             const amount = parseFloat(document.getElementById('exp-amount').value);
@@ -821,15 +836,18 @@
         }
 
         function openAddRepeaterModal() {
+            if (!checkIsYonetim(state.currentUser?.role)) return;
             openModal("Röle Ekle", `<form onsubmit="handleAddRepeater(event)" class="space-y-3"><input type="text" id="rpt-name" required placeholder="Röle Adı" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><input type="text" id="rpt-freq" required placeholder="Frekans" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><button type="submit" class="w-full bg-red-600 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button></form>`);
         }
         async function handleAddRepeater(e) {
             e.preventDefault();
+            if (!checkIsYonetim(state.currentUser?.role)) return;
             await supabaseClient.from('repeaters').insert([{ name: document.getElementById('rpt-name').value, frequency: document.getElementById('rpt-freq').value }]);
             closeModal(); await fetchAllData(); render();
         }
 
         function openAddReportModal() {
+            if (!checkIsYonetim(state.currentUser?.role)) return;
             openModal("Detaylı Rapor Ekle", `
                 <form onsubmit="handleAddReport(event)" class="space-y-3">
                     <div><label class="block text-xs text-slate-400 mb-1">Rapor Başlığı</label><input type="text" id="rep-title" required placeholder="Örn: 2026 Yılı Telsiz Kapsama Raporu" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
@@ -841,11 +859,13 @@
         }
         async function handleAddReport(e) {
             e.preventDefault();
+            if (!checkIsYonetim(state.currentUser?.role)) return;
             await supabaseClient.from('reports').insert([{ title: document.getElementById('rep-title').value, category: document.getElementById('rep-cat').value, description: document.getElementById('rep-desc').value }]);
             closeModal(); await fetchAllData(); render();
         }
 
         function openAddActivityModal() {
+            if (!checkIsYonetim(state.currentUser?.role)) return;
             const todayStr = new Date().toISOString().slice(0,10);
             openModal("Saha Faaliyeti Ekle", `
                 <form onsubmit="handleAddActivity(event)" class="space-y-3">
@@ -859,6 +879,7 @@
         }
         async function handleAddActivity(e) {
             e.preventDefault();
+            if (!checkIsYonetim(state.currentUser?.role)) return;
             const title = document.getElementById('act-title').value;
             const location = document.getElementById('act-loc').value;
             const activity_date = document.getElementById('act-date').value;
@@ -876,16 +897,19 @@
         }
 
         function openAddAnnouncementModal() {
+            if (!checkIsYonetim(state.currentUser?.role)) return;
             openModal("Duyuru Ekle", `<form onsubmit="handleAddAnnouncement(event)" class="space-y-3"><input type="text" id="ann-title" required placeholder="Başlık" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><textarea id="ann-content" required placeholder="İçerik" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></textarea><button type="submit" class="w-full bg-red-600 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Yayınla</button></form>`);
         }
         async function handleAddAnnouncement(e) {
             e.preventDefault();
+            if (!checkIsYonetim(state.currentUser?.role)) return;
             await supabaseClient.from('announcements').insert([{ title: document.getElementById('ann-title').value, content: document.getElementById('ann-content').value }]);
             closeModal(); await fetchAllData(); render();
         }
 
         window.approveMember = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('members').update({ status: 'Aktif' }).eq('id', id); await fetchAllData(); render(); } };
         window.deleteMember = async (id) => { 
+            if(!checkIsYonetim(state.currentUser?.role)) return;
             const { error } = await supabaseClient.from('members').delete().eq('id', id);
             if (error) {
                 showNotification("Silme Hatası: " + error.message, "danger");
@@ -896,7 +920,7 @@
             }
         };
         window.deleteDue = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('dues').delete().eq('id', id); await fetchAllData(); render(); } };
-        window.deleteExpense = async (id) => { await supabaseClient.from('expenses').delete().eq('id', id); await fetchAllData(); render(); showNotification("Gider silindi.", "info"); };
+        window.deleteExpense = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('expenses').delete().eq('id', id); await fetchAllData(); render(); showNotification("Gider silindi.", "info"); } };
         window.deleteRepeater = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('repeaters').delete().eq('id', id); await fetchAllData(); render(); } };
         window.deleteReport = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('reports').delete().eq('id', id); await fetchAllData(); render(); } };
         window.deleteActivity = async (id) => { 
@@ -971,8 +995,25 @@
                     new Chart(ctxBlood, { type: 'doughnut', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#DC2626', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#6366F1'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94A3B8' } } } } });
                 }
                 const ctxFee = document.getElementById('chartFeeTrend');
-                if (ctxFee) {
-                    new Chart(ctxFee, { type: 'bar', data: { labels: ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran'], datasets: [{ label: 'Tahsilat (₺)', data: [1500, 2000, 1800, 2500, 3100, 2800], backgroundColor: '#10B981' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { color: '#94A3B8' } }, y: { ticks: { color: '#94A3B8' } } }, plugins: { legend: { labels: { color: '#94A3B8' } } } } });
+                if (ctxFee && checkIsYonetim(state.currentUser?.role)) {
+                    // Gerçek Supabase verilerinden aylık aidat dağılımını hesapla
+                    const monthsOrder = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+                    const monthTotals = {};
+                    monthsOrder.forEach(m => monthTotals[m] = 0);
+                    state.fees.forEach(f => {
+                        if (f.month && monthTotals.hasOwnProperty(f.month)) {
+                            monthTotals[f.month] += (f.amount || 0);
+                        }
+                    });
+
+                    new Chart(ctxFee, { 
+                        type: 'bar', 
+                        data: { 
+                            labels: monthsOrder, 
+                            datasets: [{ label: 'Tahsilat (₺)', data: monthsOrder.map(m => monthTotals[m]), backgroundColor: '#10B981' }] 
+                        }, 
+                        options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { color: '#94A3B8' } }, y: { ticks: { color: '#94A3B8' } } }, plugins: { legend: { labels: { color: '#94A3B8' } } } } 
+                    });
                 }
             }
         }
