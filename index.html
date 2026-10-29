@@ -57,8 +57,29 @@
         const SUPABASE_KEY = "sb_publishable_FNlMWgu7kmECpYbDLkC3BA_9emOSPy4";
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Dernek Logosu (Base64 formatında doğrudan gömülü gerçek logo)[cite: 11]
-        const ATAK_LOGO_BASE64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAADwCAYAAAA+VemSAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0idXRmLTgi id=\"W5M0MpCehiHzreSzNTczkc9d\"?>";
+        // Derneğinizin Resmi Logosu (Vektörel SVG Çizimi)
+        const ATAK_LOGO_SVG = `
+            <svg viewBox="0 0 200 200" class="w-full h-full rounded-full bg-black border-2 border-red-600 shadow-md">
+                <circle cx="100" cy="100" r="92" fill="none" stroke="#D1D5DB" stroke-width="8"/>
+                <circle cx="100" cy="100" r="86" fill="#000000"/>
+                <path id="curve-top" d="M 35,100 A 65,65 0 1,1 165,100" fill="none"/>
+                <text fill="#DC2626" font-size="13" font-weight="bold" font-family="Arial">
+                    <textPath href="#curve-top" startOffset="50%" text-anchor="middle">ACİL AFET HABERLEŞME</textPath>
+                </text>
+                <text x="100" y="112" fill="#DC2626" font-size="34" font-weight="900" font-family="Arial" text-anchor="middle" letter-spacing="2">ATAK</text>
+                <g transform="translate(85, 122) scale(0.65)" stroke="#FFFFFF" stroke-width="3" fill="none">
+                    <path d="M20 40 L20 70 L30 70 L30 40 Z" fill="#FFFFFF"/>
+                    <circle cx="25" cy="28" r="8" fill="#FFFFFF"/>
+                    <path d="M5 15 Q25 -5 45 15"/>
+                    <path d="M10 22 Q25 8 40 22"/>
+                    <path d="M15 29 Q25 18 35 29"/>
+                </g>
+                <path id="curve-bot" d="M 35,105 A 65,65 0 1,0 165,105" fill="none"/>
+                <text fill="#DC2626" font-size="13" font-weight="bold" font-family="Arial">
+                    <textPath href="#curve-bot" startOffset="50%" text-anchor="middle">ARAMA KURTARMA</textPath>
+                </text>
+            </svg>
+        `;
 
         let state = {
             currentUser: null,
@@ -306,9 +327,7 @@
                         <div class="p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-800">
                             <div>
                                 <div class="flex items-center space-x-3 mb-6">
-                                    <div class="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg border border-red-400 overflow-hidden">
-                                        <i class="fa-solid fa-radio"></i>
-                                    </div>
+                                    <div class="w-12 h-12 shrink-0">${ATAK_LOGO_SVG}</div>
                                     <div><h1 class="font-extrabold text-xl tracking-wider text-white">ATAK DERNEĞİ</h1><p class="text-xs text-red-500 font-semibold">ACİL AFET HABERLEŞME</p></div>
                                 </div>
                                 <h2 class="text-lg font-bold text-slate-200 mb-4">Yönetim Paneli Girişi</h2>
@@ -341,9 +360,7 @@
                 <header class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between sticky top-0 z-40">
                     <div class="flex items-center space-x-4">
                         <div class="flex items-center space-x-3">
-                            <div class="w-9 h-9 bg-red-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md border border-red-400 overflow-hidden">
-                                <i class="fa-solid fa-radio"></i>
-                            </div>
+                            <div class="w-10 h-10 shrink-0">${ATAK_LOGO_SVG}</div>
                             <div><h1 class="font-bold text-slate-100 text-base">ATAK YÖNETİM PANELİ</h1><p class="text-[10px] text-red-500 font-bold uppercase">Acil Afet Haberleşme Derneği</p></div>
                         </div>
                         ${isY ? `
