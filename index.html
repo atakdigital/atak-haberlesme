@@ -61,6 +61,7 @@
             currentUser: null,
             users: [],
             fees: [],
+            expenses: [],
             announcements: [],
             activities: [],
             repeaters: [],
@@ -70,10 +71,38 @@
             notification: null
         };
 
+        // KESİN YETKİ KONTROLÜ (İçinde yönetim kelimesi geçmeyen herkes normal üyedir)
+        function checkIsYonetim(roleStr) {
+            if (!roleStr) return false;
+            const r = roleStr.toLowerCase().trim();
+            const managementKeywords = ['yönetim', 'baskan', 'başkan', 'sekreter', 'sayman', 'admin', 'yonetim'];
+            return managementKeywords.some(keyword => r.includes(keyword));
+        }
+
         function showNotification(msg, type = 'success') {
             state.notification = { msg, type };
             render();
             setTimeout(() => { state.notification = null; render(); }, 3500);
+        }
+
+        function playDisasterAlarmSound() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 1.5);
+            } catch (e) {
+                console.log("Ses çalınamadı:", e);
+            }
         }
 
         async function checkSession() {
@@ -85,6 +114,8 @@
                 } else {
                     state.currentUser = { id: session.user.id, full_name: session.user.email, role: 'Normal Üye', callsign: 'TA1XXX' };
                 }
+            } else {
+                state.currentUser = null;
             }
             await fetchAllData();
             initRealtimeListener();
@@ -92,9 +123,10 @@
         }
 
         async function fetchAllData() {
-            const [mRes, dRes, aRes, rRes, repRes, repPortRes, sysRes] = await Promise.all([
+            const [mRes, dRes, expRes, aRes, rRes, repRes, repPortRes, sysRes] = await Promise.all([
                 supabaseClient.from('members').select('*'),
                 supabaseClient.from('dues').select('*, members(full_name)'),
+                supabaseClient.from('expenses').select('*').catch(() => ({ data: [] })),
                 supabaseClient.from('announcements').select('*'),
                 supabaseClient.from('field_activities').select('*'),
                 supabaseClient.from('repeaters').select('*'),
@@ -111,33 +143,55 @@
                 year: d.year || 2026,
                 status: d.status || 'Ödendi'
             }));
+            if (expRes.data) state.expenses = expRes.data;
             if (aRes.data) state.announcements = aRes.data;
             if (rRes.data) state.activities = rRes.data;
             if (repRes.data) state.repeaters = repRes.data;
             if (repPortRes.data) state.reports = repPortRes.data;
+            
+            const prevDisasterState = state.disasterMode;
             if (sysRes.data) state.disasterMode = sysRes.data.value === 'true';
+
+            if (!prevDisasterState && state.disasterMode) {
+                playDisasterAlarmSound();
+            }
         }
 
-        // Supabase Realtime Dinleyicisi (Tüm cihazlarda anlık alarm tetikler)
         function initRealtimeListener() {
-            supabaseClient
-                .channel('public:system_settings')
-                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'system_settings' }, payload => {
-                    if (payload.new.key === 'disaster_mode') {
-                        state.disasterMode = payload.new.value === 'true';
+            const channel = supabaseClient.channel('db-changes');
+
+            ['members', 'dues', 'expenses', 'field_activities', 'announcements', 'system_settings', 'repeaters', 'reports'].forEach(tableName => {
+                channel.on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: tableName },
+                    async (payload) => {
+                        if (tableName === 'system_settings' && payload.new && payload.new.key === 'disaster_mode') {
+                            const newStatus = payload.new.value === 'true';
+                            if (!state.disasterMode && newStatus) {
+                                playDisasterAlarmSound();
+                            }
+                            state.disasterMode = newStatus;
+                        }
+                        await fetchAllData();
                         render();
                     }
-                })
-                .subscribe();
+                );
+            });
+
+            channel.subscribe();
         }
 
         async function toggleDisasterMode() {
+            if (!checkIsYonetim(state.currentUser?.role)) {
+                showNotification("Bu işlem için yetkiniz yok! Yalnızca Yönetim Kurulu tetikleyebilir.", 'danger');
+                return;
+            }
             const newStatus = !state.disasterMode;
-            // Veritabanındaki global durumu güncelliyoruz (Böylece bağlı olan herkes anında görecek)
             await supabaseClient.from('system_settings').upsert({ key: 'disaster_mode', value: newStatus ? 'true' : 'false' });
             
             state.disasterMode = newStatus;
             if (state.disasterMode) {
+                playDisasterAlarmSound();
                 showNotification('🚨 Kırmızı Alarm! Tüm kullanıcılara afet sinyali gönderildi.', 'danger');
             } else {
                 showNotification('Afet modu kapatıldı.', 'info');
@@ -150,8 +204,15 @@
             const email = e.target.email.value;
             const password = e.target.password.value;
             const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) showNotification("Giriş Hatası: " + error.message, 'danger');
-            else { await checkSession(); showNotification("Başarıyla giriş yapıldı."); }
+            
+            if (error) {
+                showNotification("Giriş Hatası: " + error.message, 'danger');
+            } else { 
+                await checkSession(); 
+                state.activeTab = 'dashboard';
+                render();
+                showNotification("Başarıyla giriş yapıldı."); 
+            }
         }
 
         async function handleRegister(e) {
@@ -174,7 +235,7 @@
                         id: data.user.id, email, full_name: name, callsign, role: 'Normal Üye', status: 'Onay Bekliyor'
                     }]);
                 }
-                showNotification('Kayıt başvurunuz alındı.', 'warning');
+                showNotification('Kayıt başvurunuz alındı. Yönetici onayı bekleniyor.', 'warning');
                 form.reset();
             }
         }
@@ -196,9 +257,9 @@
             `;
         }
 
-        // Tüm ekranları kaplayan Acil Afet Alarm Modalı
         function renderGlobalDisasterModal() {
             if (!state.disasterMode) return '';
+            const isY = checkIsYonetim(state.currentUser?.role);
             return `
                 <div class="fixed inset-0 bg-red-950/90 z-50 flex items-center justify-center p-6 backdrop-blur-md disaster-pulse">
                     <div class="bg-slate-950 border-4 border-red-600 rounded-3xl p-8 max-w-xl w-full text-center space-y-6 shadow-2xl shadow-red-600/50">
@@ -210,10 +271,10 @@
                             <p class="text-lg font-bold text-slate-100">ACİL AFET HABERLEŞME DURUMU TETİKLENDİ</p>
                             <p class="text-xs text-slate-400 leading-relaxed">Dernek yönetimi tarafından olağanüstü afet durumu ilan edilmiştir. Lütfen telsizlerinizi ilgili acil durum frekanslarına ayarlayın ve operasyon talimatlarını bekleyin.</p>
                         </div>
-                        <div class="p-4 bg-red-950/60 border border-red-800 rounded-xl text-red-300 text-xs font-mono">
-                            📡 AKTİF ÇAĞRI KANALI: 145.500 MHz / RÖLE: TA1KAS
+                        <div class="p-4 bg-red-950/60 border border-red-800 rounded-xl text-red-300 text-xs font-mono font-bold">
+                            AKTİF ÇAĞRI KANALI: 439.2625 MHz / SAHA FREKANSI: 433.475 MHz
                         </div>
-                        ${hasPermission(state.currentUser?.role) ? `
+                        ${isY ? `
                             <button onclick="toggleDisasterMode()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer">
                                 Afet Modunu Kapat (Yönetim Yetkisi)
                             </button>
@@ -223,11 +284,6 @@
                     </div>
                 </div>
             `;
-        }
-
-        function hasPermission(role) {
-            const managementRoles = ['Yönetim Kurulu Başkanı', 'Başkan Yardımcısı', 'Genel Sekreter', 'Sayman'];
-            return managementRoles.includes(role);
         }
 
         function renderAuthScreen() {
@@ -250,7 +306,8 @@
                         </div>
                         <div class="p-8 bg-slate-900/50">
                             <h2 class="text-lg font-bold text-slate-200 mb-1">Yeni Üye Kaydı</h2>
-                            <form onsubmit="handleRegister(event)" class="space-y-3 mt-4">
+                            <p class="text-[11px] text-amber-400 mb-3">Kayıt olduktan sonra mail onayı gerekmez, doğrudan yönetici onayı beklenir.</p>
+                            <form onsubmit="handleRegister(event)" class="space-y-3 mt-2">
                                 <div><label class="block text-xs font-medium text-slate-400 mb-1">Ad Soyad</label><input type="text" name="name" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100"></div>
                                 <div><label class="block text-xs font-medium text-slate-400 mb-1">Callsign</label><input type="text" name="callsign" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100"></div>
                                 <div><label class="block text-xs font-medium text-slate-400 mb-1">E-posta</label><input type="email" name="email" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100"></div>
@@ -264,6 +321,7 @@
         }
 
         function renderHeader() {
+            const isY = checkIsYonetim(state.currentUser.role);
             return `
                 <header class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between sticky top-0 z-40">
                     <div class="flex items-center space-x-4">
@@ -271,9 +329,11 @@
                             <div class="w-9 h-9 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold"><i class="fa-solid fa-radio"></i></div>
                             <div><h1 class="font-bold text-slate-100 text-base">ATAK YÖNETİM PANELİ</h1><p class="text-[10px] text-red-500 font-bold uppercase">Acil Afet Haberleşme Derneği</p></div>
                         </div>
-                        <button onclick="toggleDisasterMode()" class="ml-6 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-2 ${state.disasterMode ? 'bg-red-600 text-white disaster-pulse animate-bounce' : 'bg-red-950/40 text-red-400 border border-red-800'} cursor-pointer">
-                            <i class="fa-solid fa-triangle-exclamation"></i><span>${state.disasterMode ? 'AFET MODU AKTİF (KAPAT)' : 'AFET MODUNU TETİKLE'}</span>
-                        </button>
+                        ${isY ? `
+                            <button onclick="toggleDisasterMode()" class="ml-6 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-2 ${state.disasterMode ? 'bg-red-600 text-white disaster-pulse animate-bounce' : 'bg-red-950/40 text-red-400 border border-red-800'} cursor-pointer">
+                                <i class="fa-solid fa-triangle-exclamation"></i><span>${state.disasterMode ? 'AFET MODU AKTİF (KAPAT)' : 'AFET MODUNU TETİKLE'}</span>
+                            </button>
+                        ` : ''}
                     </div>
                     <div class="flex items-center space-x-4">
                         <div class="text-right hidden sm:block">
@@ -290,7 +350,7 @@
             const tabs = [
                 { id: 'dashboard', label: 'Genel Bakış', icon: 'fa-chart-pie' },
                 { id: 'users', label: 'Üye Yönetimi', icon: 'fa-users' },
-                { id: 'fees', label: 'Aidat & Finans', icon: 'fa-wallet' },
+                { id: 'fees', label: 'Aidat & Ek Giderler', icon: 'fa-wallet' },
                 { id: 'radio', label: 'Afet & Telsiz Sahası', icon: 'fa-tower-cell' },
                 { id: 'reports', label: 'Raporlar', icon: 'fa-chart-column' },
                 { id: 'activities', label: 'Saha Faaliyetleri', icon: 'fa-person-hiking' },
@@ -315,12 +375,15 @@
             const approvedUsers = state.users.filter(u => u.status === 'Aktif');
             const totalFees = state.fees.reduce((sum, f) => sum + (f.amount || 0), 0);
             const pendingUsers = state.users.filter(u => u.status === 'Onay Bekliyor');
+            const isY = checkIsYonetim(state.currentUser?.role);
 
             return `
                 <div class="space-y-6">
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Toplam Onaylı Üye</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${approvedUsers.length}</h3></div><div class="w-12 h-12 bg-blue-950/65 border border-blue-800 text-blue-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-users"></i></div></div>
-                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Toplam Aidat Tahsilatı</p><h3 class="text-2xl font-bold text-slate-100 mt-1">₺${totalFees.toLocaleString()}</h3></div><div class="w-12 h-12 bg-emerald-950/65 border border-emerald-800 text-emerald-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-turkish-lira-sign"></i></div></div>
+                        ${isY ? `
+                            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Toplam Aidat Tahsilatı</p><h3 class="text-2xl font-bold text-slate-100 mt-1">₺${totalFees.toLocaleString()}</h3></div><div class="w-12 h-12 bg-emerald-950/65 border border-emerald-800 text-emerald-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-turkish-lira-sign"></i></div></div>
+                        ` : ''}
                         <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Aktif Saha Faaliyetleri</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${state.activities.length}</h3></div><div class="w-12 h-12 bg-amber-950/65 border border-amber-800 text-amber-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-person-hiking"></i></div></div>
                         <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between"><div><p class="text-xs text-slate-400">Onay Bekleyen Üye</p><h3 class="text-2xl font-bold text-slate-100 mt-1">${pendingUsers.length}</h3></div><div class="w-12 h-12 bg-purple-950/65 border border-purple-800 text-purple-400 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-user-clock"></i></div></div>
                     </div>
@@ -333,6 +396,7 @@
         }
 
         function renderUsersView() {
+            const isY = checkIsYonetim(state.currentUser?.role);
             return `
                 <div class="space-y-6">
                     <div class="flex items-center justify-between"><div><h2 class="text-lg font-bold text-slate-100">Dernek Üye Yönetimi</h2><p class="text-xs text-slate-400">Üye kayıtları ve yetki rolleri</p></div></div>
@@ -353,9 +417,11 @@
                                             <td class="px-4 py-3 text-amber-400">${u.role}</td>
                                             <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${u.status === 'Aktif' ? 'bg-emerald-950 text-emerald-400' : 'bg-amber-950 text-amber-400'}">${u.status}</span></td>
                                             <td class="px-4 py-3 text-right space-x-1">
-                                                ${u.status === 'Onay Bekliyor' ? `<button onclick="approveMember('${u.id}')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] rounded cursor-pointer">Onayla</button>` : ''}
-                                                <button onclick="openEditMemberModal('${u.id}')" class="text-blue-400 hover:text-blue-300 p-1 cursor-pointer" title="Düzenle"><i class="fa-solid fa-pen-to-square"></i></button>
-                                                <button onclick="deleteMember('${u.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer" title="Sil"><i class="fa-solid fa-trash-can"></i></button>
+                                                ${isY ? `
+                                                    ${u.status === 'Onay Bekliyor' ? `<button onclick="approveMember('${u.id}')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] rounded cursor-pointer">Onayla</button>` : ''}
+                                                    <button onclick="openEditMemberModal('${u.id}')" class="text-blue-400 hover:text-blue-300 p-1 cursor-pointer" title="Düzenle"><i class="fa-solid fa-pen-to-square"></i></button>
+                                                    <button onclick="deleteMember('${u.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer" title="Sil"><i class="fa-solid fa-trash-can"></i></button>
+                                                ` : `<span class="text-[11px] text-slate-500 italic">Salt Okunur</span>`}
                                             </td>
                                         </tr>
                                     `).join('')}
@@ -368,48 +434,109 @@
         }
 
         function renderFeesView() {
+            const isY = checkIsYonetim(state.currentUser?.role);
+
+            if (!isY) {
+                return `
+                    <div class="space-y-6">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-100">💰 Aylık Aidat & Ek Gider Yönetimi</h2>
+                            <p class="text-xs text-slate-400">Üye ödemeleri ve dernek ek giderlerinin takibi</p>
+                        </div>
+                        <div class="bg-slate-900 border border-red-900/50 p-12 rounded-2xl text-center space-y-4 shadow-xl">
+                            <div class="w-16 h-16 bg-red-950/80 text-red-500 border border-red-800 rounded-full flex items-center justify-center mx-auto text-3xl">
+                                <i class="fa-solid fa-lock"></i>
+                            </div>
+                            <div class="space-y-1">
+                                <h3 class="text-lg font-bold text-slate-100">Erişim Yetkisi Sınırlı</h3>
+                                <p class="text-xs text-slate-400 max-w-md mx-auto">
+                                    Bu modülü ve mali kayıtları görüntüleme, düzenleme veya işlem yapma yetkiniz bulunmamaktadır. Yalnızca <strong>Yönetim Kurulu</strong> üyeleri erişebilir.
+                                </p>
+                            </div>
+                            <div class="inline-block px-3 py-1 bg-red-950/40 border border-red-800/60 rounded-full text-[11px] text-red-400 font-mono">
+                                Mevcut Rolünüz: ${state.currentUser?.role || 'Normal Üye'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const totalExpenses = state.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+
             return `
-                <div class="space-y-6">
+                <div class="space-y-8">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h2 class="text-lg font-bold text-slate-100">💰 Aylık Aidat & Finans Takibi</h2>
-                            <p class="text-xs text-slate-400">Üyelerin aylık ödemeleri ve tahsilat takvimi</p>
+                            <h2 class="text-lg font-bold text-slate-100">💰 Aylık Aidat & Ek Gider Yönetimi</h2>
+                            <p class="text-xs text-slate-400">Üye ödemeleri ve dernek ek giderlerinin takibi</p>
                         </div>
-                        <button onclick="openAddDueModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Aylık Aidat Tahsil Et</button>
+                        <div class="space-x-2">
+                            <button onclick="openAddDueModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Aidat Tahsil Et</button>
+                            <button onclick="openAddExpenseModal()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Ek Gider Ekle</button>
+                        </div>
                     </div>
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
-                        <table class="w-full text-left text-xs text-slate-300">
-                            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
-                                <tr><th class="px-4 py-3">Üye Adı</th><th class="px-4 py-3">Aidat Ayı</th><th class="px-4 py-3">Yıl</th><th class="px-4 py-3">Tutar</th><th class="px-4 py-3">Durum</th><th class="px-4 py-3 text-right">İşlem</th></tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-800">
-                                ${state.fees.map(f => `
-                                    <tr class="hover:bg-slate-800/50">
-                                        <td class="px-4 py-3 font-semibold text-slate-100">${f.memberName}</td>
-                                        <td class="px-4 py-3 text-blue-400 font-bold"><i class="fa-solid fa-calendar-days mr-1"></i> ${f.month}</td>
-                                        <td class="px-4 py-3 text-slate-400">${f.year}</td>
-                                        <td class="px-4 py-3 text-emerald-400 font-bold">₺${f.amount}</td>
-                                        <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400">Ödendi</span></td>
-                                        <td class="px-4 py-3 text-right"><button onclick="deleteDue('${f.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer" title="Sil"><i class="fa-solid fa-trash-can"></i></button></td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+
+                    <div class="space-y-3">
+                        <h3 class="font-bold text-slate-200 text-sm">Aidat Listesi</h3>
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+                            <table class="w-full text-left text-xs text-slate-300">
+                                <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
+                                    <tr><th class="px-4 py-3">Üye Adı</th><th class="px-4 py-3">Ay</th><th class="px-4 py-3">Yıl</th><th class="px-4 py-3">Tutar</th><th class="px-4 py-3">Durum</th><th class="px-4 py-3 text-right">İşlem</th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-800">
+                                    ${state.fees.map(f => `
+                                        <tr class="hover:bg-slate-800/50">
+                                            <td class="px-4 py-3 font-semibold text-slate-100">${f.memberName}</td>
+                                            <td class="px-4 py-3 text-blue-400 font-bold">${f.month}</td>
+                                            <td class="px-4 py-3 text-slate-400">${f.year}</td>
+                                            <td class="px-4 py-3 text-emerald-400 font-bold">₺${f.amount}</td>
+                                            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400">Ödendi</span></td>
+                                            <td class="px-4 py-3 text-right"><button onclick="deleteDue('${f.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h3 class="font-bold text-slate-200 text-sm">Ek Giderler Bölümü</h3>
+                            <span class="text-xs text-red-400 font-bold">Toplam Gider: ₺${totalExpenses.toLocaleString()}</span>
+                        </div>
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+                            <table class="w-full text-left text-xs text-slate-300">
+                                <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
+                                    <tr><th class="px-4 py-3">Gider Adı / Açıklama</th><th class="px-4 py-3">Tutar</th><th class="px-4 py-3">Tarih</th><th class="px-4 py-3 text-right">İşlem</th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-800">
+                                    ${state.expenses.map(e => `
+                                        <tr class="hover:bg-slate-800/50">
+                                            <td class="px-4 py-3 font-semibold text-slate-100">${e.title}</td>
+                                            <td class="px-4 py-3 text-red-400 font-bold">₺${e.amount}</td>
+                                            <td class="px-4 py-3 text-slate-400">${e.date || '2026'}</td>
+                                            <td class="px-4 py-3 text-right"><button onclick="deleteExpense('${e.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             `;
         }
 
         function renderRadioView() {
+            const isY = checkIsYonetim(state.currentUser?.role);
             return `
                 <div class="space-y-6">
-                    <div class="flex items-center justify-between"><div><h2 class="text-lg font-bold text-slate-100">Afet & Telsiz Sahası Durumu</h2></div><button onclick="openAddRepeaterModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Röle Ekle</button></div>
+                    <div class="flex items-center justify-between"><div><h2 class="text-lg font-bold text-slate-100">Afet & Telsiz Sahası Durumu</h2></div>${isY ? `<button onclick="openAddRepeaterModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Röle Ekle</button>` : ''}</div>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         ${state.repeaters.map(r => `
                             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl relative">
                                 <div class="flex items-center justify-between mb-2"><span class="font-bold text-red-400 font-mono text-sm">${r.name}</span><span class="px-2 py-0.5 bg-emerald-950 text-emerald-400 text-[10px] font-bold rounded">ONLINE</span></div>
                                 <div class="text-xs text-slate-300">Frekans: ${r.frequency}</div><div class="text-xs text-slate-400">Konum: ${r.location || '-'}</div>
-                                <button onclick="deleteRepeater('${r.id}')" class="absolute top-3 right-3 text-slate-500 hover:text-red-400 text-xs cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>
+                                ${isY ? `<button onclick="deleteRepeater('${r.id}')" class="absolute top-3 right-3 text-slate-500 hover:text-red-400 text-xs cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>` : ''}
                             </div>
                         `).join('')}
                     </div>
@@ -418,11 +545,12 @@
         }
 
         function renderReportsView() {
+            const isY = checkIsYonetim(state.currentUser?.role);
             return `
                 <div class="space-y-6">
                     <div class="flex items-center justify-between">
                         <div><h2 class="text-lg font-bold text-slate-100">📊 Dernek Raporları & Analitik</h2><p class="text-xs text-slate-400">Operasyonel raporlar ve detaylı açıklamalar</p></div>
-                        <button onclick="openAddReportModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Rapor Ekle</button>
+                        ${isY ? `<button onclick="openAddReportModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Rapor Ekle</button>` : ''}
                     </div>
                     <div class="space-y-3">
                         ${state.reports.map(rep => `
@@ -432,7 +560,7 @@
                                     <h4 class="font-bold text-slate-100 text-base">${rep.title}</h4>
                                 </div>
                                 <p class="text-xs text-slate-300 leading-relaxed">${rep.description || 'Açıklama girilmemiş.'}</p>
-                                <button onclick="deleteReport('${rep.id}')" class="absolute top-4 right-4 text-slate-500 hover:text-red-400 text-xs cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>
+                                ${isY ? `<button onclick="deleteReport('${rep.id}')" class="absolute top-4 right-4 text-slate-500 hover:text-red-400 text-xs cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>` : ''}
                             </div>
                         `).join('')}
                     </div>
@@ -441,22 +569,31 @@
         }
 
         function renderActivitiesView() {
+            const isY = checkIsYonetim(state.currentUser?.role);
             return `
                 <div class="space-y-6">
-                    <div class="flex items-center justify-between"><div><h2 class="text-lg font-bold text-slate-100">📡 Saha Faaliyetleri & Tatbikatlar</h2></div><button onclick="openAddActivityModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Faaliyet Ekle</button></div>
+                    <div class="flex items-center justify-between"><div><h2 class="text-lg font-bold text-slate-100">📡 Saha Faaliyetleri & Tatbikatlar</h2></div>${isY ? `<button onclick="openAddActivityModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Faaliyet Ekle</button>` : ''}</div>
                     <div class="space-y-3">
-                        ${state.activities.map(a => `<div class="bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-center justify-between"><div><h4 class="font-bold text-slate-100 text-sm">${a.title}</h4><p class="text-xs text-slate-400 mt-1">${a.description || ''} • <span class="text-red-400">${a.location || ''}</span></p></div><button onclick="deleteActivity('${a.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></div>`).join('')}
+                        ${state.activities.map(a => `
+                            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-2 relative">
+                                <h4 class="font-bold text-slate-100 text-base">${a.title}</h4>
+                                <p class="text-xs text-slate-300"><strong class="text-red-400">Konum:</strong> ${a.location || 'Belirtilmemiş'}</p>
+                                <p class="text-xs text-slate-400 bg-slate-950 p-3 rounded-lg border border-slate-800"><strong class="text-slate-200">Açıklama:</strong> ${a.description || 'Açıklama girilmemiş.'}</p>
+                                ${isY ? `<button onclick="deleteActivity('${a.id}')" class="absolute top-4 right-4 text-slate-500 hover:text-red-400 text-xs cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>` : ''}
+                            </div>
+                        `).join('')}
                     </div>
                 </div>
             `;
         }
 
         function renderAnnouncementsView() {
+            const isY = checkIsYonetim(state.currentUser?.role);
             return `
                 <div class="space-y-6">
-                    <div class="flex items-center justify-between"><div><h2 class="text-lg font-bold text-slate-100">📢 Duyurular & Bilgilendirmeler</h2></div><button onclick="openAddAnnouncementModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Duyuru Ekle</button></div>
+                    <div class="flex items-center justify-between"><div><h2 class="text-lg font-bold text-slate-100">📢 Duyurular & Bilgilendirmeler</h2></div>${isY ? `<button onclick="openAddAnnouncementModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Duyuru Ekle</button>` : ''}</div>
                     <div class="space-y-3">
-                        ${state.announcements.map(ann => `<div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-2 relative"><h4 class="font-bold text-slate-100 text-base">${ann.title}</h4><p class="text-xs text-slate-300">${ann.content}</p><button onclick="deleteAnnouncement('${ann.id}')" class="absolute top-4 right-4 text-slate-500 hover:text-red-400 text-xs cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></div>`).join('')}
+                        ${state.announcements.map(ann => `<div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-2 relative"><h4 class="font-bold text-slate-100 text-base">${ann.title}</h4><p class="text-xs text-slate-300">${ann.content}</p>${isY ? `<button onclick="deleteAnnouncement('${ann.id}')" class="absolute top-4 right-4 text-slate-500 hover:text-red-400 text-xs cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>` : ''}</div>`).join('')}
                     </div>
                 </div>
             `;
@@ -474,6 +611,7 @@
         function closeModal() { document.getElementById('universal-modal').classList.add('hidden'); }
 
         function openEditMemberModal(id) {
+            if (!checkIsYonetim(state.currentUser?.role)) return;
             const member = state.users.find(u => u.id === id);
             if (!member) return;
 
@@ -559,6 +697,32 @@
             }
         }
 
+        function openAddExpenseModal() {
+            openModal("Ek Gider Ekle", `
+                <form onsubmit="handleAddExpense(event)" class="space-y-3">
+                    <div><label class="block text-xs text-slate-400 mb-1">Gider Adı / Açıklama</label><input type="text" id="exp-title" required placeholder="Örn: Telsiz Bakım ve Onarım Gideri" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Tutar (₺)</label><input type="number" id="exp-amount" required placeholder="1250" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <button type="submit" class="w-full bg-amber-600 hover:bg-amber-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Ek Gideri Kaydet</button>
+                </form>
+            `);
+        }
+
+        async function handleAddExpense(e) {
+            e.preventDefault();
+            const title = document.getElementById('exp-title').value;
+            const amount = parseFloat(document.getElementById('exp-amount').value);
+
+            const { error } = await supabaseClient.from('expenses').insert([{ title, amount, date: '2026-10' }]);
+            if (error) {
+                showNotification("Ek Gider Kayıt Hatası: " + error.message, 'danger');
+            } else {
+                showNotification("Ek gider başarıyla eklendi.");
+                closeModal();
+                await fetchAllData();
+                render();
+            }
+        }
+
         function openAddRepeaterModal() {
             openModal("Röle Ekle", `<form onsubmit="handleAddRepeater(event)" class="space-y-3"><input type="text" id="rpt-name" required placeholder="Röle Adı" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><input type="text" id="rpt-freq" required placeholder="Frekans" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><button type="submit" class="w-full bg-red-600 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button></form>`);
         }
@@ -585,11 +749,22 @@
         }
 
         function openAddActivityModal() {
-            openModal("Faaliyet Ekle", `<form onsubmit="handleAddActivity(event)" class="space-y-3"><input type="text" id="act-title" required placeholder="Başlık" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><input type="text" id="act-loc" required placeholder="Konum" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"><button type="submit" class="w-full bg-amber-600 text-slate-950 py-2 rounded-lg text-xs font-bold cursor-pointer">Kaydet</button></form>`);
+            openModal("Saha Faaliyeti Ekle", `
+                <form onsubmit="handleAddActivity(event)" class="space-y-3">
+                    <div><label class="block text-xs text-slate-400 mb-1">Faaliyet Başlığı</label><input type="text" id="act-title" required placeholder="Örn: Doğa Tatbikatı" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Konum</label><input type="text" id="act-loc" required placeholder="Örn: İzmir Bölgesi" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Açıklama</label><textarea id="act-desc" rows="3" required placeholder="Faaliyet detaylarını girin..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></textarea></div>
+                    <button type="submit" class="w-full bg-amber-600 text-slate-950 py-2 rounded-lg text-xs font-bold cursor-pointer">Faaliyeti Kaydet</button>
+                </form>
+            `);
         }
         async function handleAddActivity(e) {
             e.preventDefault();
-            await supabaseClient.from('field_activities').insert([{ title: document.getElementById('act-title').value, location: document.getElementById('act-loc').value }]);
+            await supabaseClient.from('field_activities').insert([{ 
+                title: document.getElementById('act-title').value, 
+                location: document.getElementById('act-loc').value,
+                description: document.getElementById('act-desc').value 
+            }]);
             closeModal(); await fetchAllData(); render();
         }
 
@@ -602,13 +777,14 @@
             closeModal(); await fetchAllData(); render();
         }
 
-        window.approveMember = async (id) => { await supabaseClient.from('members').update({ status: 'Aktif' }).eq('id', id); await fetchAllData(); render(); };
-        window.deleteMember = async (id) => { if(confirm("Silmek istediğinize emin misiniz?")) { await supabaseClient.from('members').delete().eq('id', id); await fetchAllData(); render(); } };
-        window.deleteDue = async (id) => { await supabaseClient.from('dues').delete().eq('id', id); await fetchAllData(); render(); };
-        window.deleteRepeater = async (id) => { await supabaseClient.from('repeaters').delete().eq('id', id); await fetchAllData(); render(); };
-        window.deleteReport = async (id) => { await supabaseClient.from('reports').delete().eq('id', id); await fetchAllData(); render(); };
-        window.deleteActivity = async (id) => { await supabaseClient.from('field_activities').delete().eq('id', id); await fetchAllData(); render(); };
-        window.deleteAnnouncement = async (id) => { await supabaseClient.from('announcements').delete().eq('id', id); await fetchAllData(); render(); };
+        window.approveMember = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('members').update({ status: 'Aktif' }).eq('id', id); await fetchAllData(); render(); } };
+        window.deleteMember = async (id) => { if(checkIsYonetim(state.currentUser?.role) && confirm("Silmek istediğinize emin misiniz?")) { await supabaseClient.from('members').delete().eq('id', id); await fetchAllData(); render(); } };
+        window.deleteDue = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('dues').delete().eq('id', id); await fetchAllData(); render(); } };
+        window.deleteExpense = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('expenses').delete().eq('id', id); await fetchAllData(); render(); } };
+        window.deleteRepeater = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('repeaters').delete().eq('id', id); await fetchAllData(); render(); } };
+        window.deleteReport = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('reports').delete().eq('id', id); await fetchAllData(); render(); } };
+        window.deleteActivity = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('field_activities').delete().eq('id', id); await fetchAllData(); render(); } };
+        window.deleteAnnouncement = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('announcements').delete().eq('id', id); await fetchAllData(); render(); } };
 
         function render() {
             const root = document.getElementById('app');
