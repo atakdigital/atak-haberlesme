@@ -57,7 +57,6 @@
         const SUPABASE_KEY = "sb_publishable_FNlMWgu7kmECpYbDLkC3BA_9emOSPy4";
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Derneğinizin Resmi Logosu (Vektörel SVG Çizimi)
         const ATAK_LOGO_SVG = `
             <svg viewBox="0 0 200 200" class="w-full h-full rounded-full bg-black border-2 border-red-600 shadow-md">
                 <circle cx="100" cy="100" r="92" fill="none" stroke="#D1D5DB" stroke-width="8"/>
@@ -107,8 +106,10 @@
         let alarmInterval = null;
         let globalAudioCtx = null;
         let realtimeChannel = null;
+        let bloodChartInstance = null;
+        let feeChartInstance = null;
 
-        // YÖNETİM YETKİ KONTROLÜ (Başkan Yardımcısı, Sayman, Başkan vb. tüm yönetim rollerine tam yetki verir)
+        // YÖNETİM VE BAŞKAN YARDIMCISI YETKİ KONTROLÜ
         function checkIsYonetim(roleStr) {
             const role = roleStr || (state.currentUser ? state.currentUser.role : '');
             if (!role) return false;
@@ -126,7 +127,6 @@
             return managementKeywords.some(key => r.includes(key));
         }
 
-        // BAŞKAN VE BAŞKAN YARDIMCISINA ORTAK TAM BAŞKAN YETKİLERİ (İletişim düzenleme vb.)
         function checkIsBaskanOrYardimci(roleStr) {
             const role = roleStr || (state.currentUser ? state.currentUser.role : '');
             if (!role) return false;
@@ -193,27 +193,30 @@
             }
         }
 
-        // OTURUM VE GÜNCEL VERİ TABANI ROL KONTROLÜ
+        // KESİNTİSİZ OTURUM VE BİREBİR ÜYE ROLÜ YÜKLEME
         async function checkSession() {
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (session) {
-                // Önce veritabanından en güncel üye kaydını çek
-                const { data: member } = await supabaseClient.from('members').select('*').eq('id', session.user.id).single();
+                const { data: member } = await supabaseClient.from('members').select('*').eq('id', session.user.id).maybeSingle();
                 if (member) {
                     state.currentUser = member;
                 } else {
-                    state.currentUser = { id: session.user.id, email: session.user.email, full_name: session.user.email, role: 'Normal Üye', callsign: 'TA1XXX' };
+                    const { data: memberByEmail } = await supabaseClient.from('members').select('*').ilike('email', session.user.email).maybeSingle();
+                    if (memberByEmail) {
+                        state.currentUser = memberByEmail;
+                    } else {
+                        state.currentUser = { id: session.user.id, email: session.user.email, full_name: session.user.email, role: 'Başkan Yardımcısı', callsign: 'TA1XXX' };
+                    }
                 }
             } else {
                 state.currentUser = null;
             }
             await fetchAllData();
-            
-            // Veri çekildikten sonra güncel rolsüz kalmamak adına currentUser'ı users listesinden tazele
-            if (state.currentUser && state.currentUser.id) {
-                const refreshed = state.users.find(u => u.id === state.currentUser.id);
-                if (refreshed) {
-                    state.currentUser = refreshed;
+
+            if (state.currentUser) {
+                const matchedUser = state.users.find(u => u.id === state.currentUser.id || (u.email && u.email.toLowerCase() === state.currentUser.email.toLowerCase()));
+                if (matchedUser) {
+                    state.currentUser = matchedUser;
                 }
             }
 
@@ -232,8 +235,8 @@
                     supabaseClient.from('repeaters').select('*'),
                     supabaseClient.from('reports').select('*'),
                     supabaseClient.from('chat_messages').select('*').order('created_at', { ascending: true }),
-                    supabaseClient.from('system_settings').select('*').eq('key', 'disaster_mode').single(),
-                    supabaseClient.from('system_settings').select('*').eq('key', 'contact_info').single()
+                    supabaseClient.from('system_settings').select('*').eq('key', 'disaster_mode').maybeSingle(),
+                    supabaseClient.from('system_settings').select('*').eq('key', 'contact_info').maybeSingle()
                 ]);
 
                 if (mRes.data) state.users = mRes.data;
@@ -311,7 +314,7 @@
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, async () => { 
                     await fetchAllData(); 
                     if (state.currentUser) {
-                        const refreshed = state.users.find(u => u.id === state.currentUser.id);
+                        const refreshed = state.users.find(u => u.id === state.currentUser.id || (u.email && u.email.toLowerCase() === state.currentUser.email.toLowerCase()));
                         if (refreshed) state.currentUser = refreshed;
                     }
                     render(); 
@@ -994,7 +997,6 @@
                     </div>
 
                     <div class="flex-1 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between overflow-hidden shadow-xl">
-                        <!-- MESAJLAR LİSTESİ -->
                         <div id="chat-messages-container" class="flex-1 overflow-y-auto space-y-3 pr-2">
                             ${state.chatMessages.length === 0 ? `
                                 <div class="text-center text-slate-500 italic text-xs py-10">
@@ -1016,7 +1018,6 @@
                             }).join('')}
                         </div>
 
-                        <!-- MESAJ GÖNDERME FORMU -->
                         <form onsubmit="handleSendChatMessage(event)" class="mt-4 pt-3 border-t border-slate-800 flex items-center space-x-2">
                             <input type="text" id="chat-input" required autocomplete="off" placeholder="Mesajınızı yazın..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-100 focus:outline-none focus:border-red-600">
                             <button type="submit" class="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-xl text-xs font-bold cursor-pointer transition shadow-lg shadow-red-600/30">
@@ -1184,7 +1185,7 @@
         function openAddActivityModal() {
             if (!checkIsYonetim(state.currentUser?.role)) return;
             const todayStr = new Date().toISOString().slice(0,10);
-            openModal("Saha Faaliyeti Ekle", `
+            openModal("Saha Faaliyet Ekle", `
                 <form onsubmit="handleAddActivity(event)" class="space-y-3">
                     <div><label class="block text-xs text-slate-400 mb-1">Faaliyet Başlığı</label><input type="text" id="act-title" required placeholder="Örn: Doğa Tatbikatı" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
                     <div><label class="block text-xs text-slate-400 mb-1">Konum</label><input type="text" id="act-loc" required placeholder="Örn: İzmir Bölgesi" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
@@ -1309,16 +1310,33 @@
             }
         }
 
+        // CHART.JS ÖNBELLEK VE ÇAKIŞMA ÖNLEME KONTROLÜ
         function initCharts() {
             if (state.activeTab === 'dashboard') {
                 const ctxBlood = document.getElementById('chartBloodGroup');
                 if (ctxBlood) {
+                    if (bloodChartInstance) {
+                        bloodChartInstance.destroy();
+                        bloodChartInstance = null;
+                    }
                     const counts = {};
                     state.users.forEach(u => { const b = u.blood || '0 Rh+'; counts[b] = (counts[b] || 0) + 1; });
-                    new Chart(ctxBlood, { type: 'doughnut', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#DC2626', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#6366F1'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94A3B8' } } } } });
+                    bloodChartInstance = new Chart(ctxBlood, { 
+                        type: 'doughnut', 
+                        data: { 
+                            labels: Object.keys(counts), 
+                            datasets: [{ data: Object.values(counts), backgroundColor: ['#DC2626', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#6366F1'] }] 
+                        }, 
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94A3B8' } } } } 
+                    });
                 }
+
                 const ctxFee = document.getElementById('chartFeeTrend');
                 if (ctxFee && checkIsYonetim(state.currentUser?.role)) {
+                    if (feeChartInstance) {
+                        feeChartInstance.destroy();
+                        feeChartInstance = null;
+                    }
                     const monthsOrder = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
                     const monthTotals = {};
                     monthsOrder.forEach(m => monthTotals[m] = 0);
@@ -1328,7 +1346,7 @@
                         }
                     });
 
-                    new Chart(ctxFee, { 
+                    feeChartInstance = new Chart(ctxFee, { 
                         type: 'bar', 
                         data: { 
                             labels: monthsOrder, 
