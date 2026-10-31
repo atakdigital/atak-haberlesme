@@ -125,7 +125,6 @@
             return managementKeywords.some(key => r.includes(key));
         }
 
-        // SADECE YÖNETİM KURULU BAŞKANI KONTROLÜ
         function checkIsBaskan(roleStr) {
             const role = roleStr || (state.currentUser ? state.currentUser.role : '');
             if (!role) return false;
@@ -350,6 +349,7 @@
             }
         }
 
+        // GÜNCELLENMİŞ KAYIT FONKSİYONU: Telefon ve Kan Grubu Alınıyor
         async function handleRegister(e) {
             e.preventDefault();
             const form = e.target;
@@ -357,17 +357,19 @@
             const password = form.password.value;
             const name = form.name.value;
             const callsign = form.callsign.value.toUpperCase();
+            const phone = form.phone.value;
+            const blood = form.blood.value;
 
             const { data, error } = await supabaseClient.auth.signUp({
                 email, password,
-                options: { data: { full_name: name, callsign } }
+                options: { data: { full_name: name, callsign, phone, blood } }
             });
 
             if (error) showNotification("Kayıt Hatası: " + error.message, 'danger');
             else {
                 if (data.user) {
                     await supabaseClient.from('members').insert([{
-                        id: data.user.id, email, full_name: name, callsign, role: 'Normal Üye', status: 'Onay Bekliyor'
+                        id: data.user.id, email, full_name: name, callsign, phone, blood, role: 'Normal Üye', status: 'Onay Bekliyor'
                     }]);
                 }
                 showNotification('Kayıt başvurunuz alındı. Yönetici onayı bekleniyor.', 'warning');
@@ -428,6 +430,7 @@
             `;
         }
 
+        // GÜNCELLENMİŞ KAYIT EKRANI: Telefon ve Kan Grubu Alanları Eklendi
         function renderAuthScreen() {
             return `
                 <div class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-red-950">
@@ -449,12 +452,28 @@
                         <div class="p-8 bg-slate-900/50 flex flex-col justify-center">
                             <h2 class="text-lg font-bold text-slate-200 mb-1">Yeni Üye Kaydı</h2>
                             <p class="text-[11px] text-amber-400 mb-3">Kayıt olduktan sonra mail onayı gerekmez, doğrudan yönetici onayı beklenir.</p>
-                            <form onsubmit="handleRegister(event)" class="space-y-3 mt-2">
-                                <div><label class="block text-xs font-medium text-slate-400 mb-1">Ad Soyad</label><input type="text" name="name" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100"></div>
-                                <div><label class="block text-xs font-medium text-slate-400 mb-1">Callsign</label><input type="text" name="callsign" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100"></div>
-                                <div><label class="block text-xs font-medium text-slate-400 mb-1">E-posta</label><input type="email" name="email" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100"></div>
-                                <div><label class="block text-xs font-medium text-slate-400 mb-1">Şifre</label><input type="password" name="password" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-100"></div>
-                                <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold py-2 rounded-lg text-sm cursor-pointer mt-2">Kayıt Ol</button>
+                            <form onsubmit="handleRegister(event)" class="space-y-2.5 mt-1">
+                                <div><label class="block text-xs font-medium text-slate-400 mb-0.5">Ad Soyad</label><input type="text" name="name" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1 text-sm text-slate-100"></div>
+                                <div><label class="block text-xs font-medium text-slate-400 mb-0.5">Callsign</label><input type="text" name="callsign" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1 text-sm text-slate-100"></div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div><label class="block text-xs font-medium text-slate-400 mb-0.5">Telefon Numarası</label><input type="tel" name="phone" required placeholder="0532..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1 text-sm text-slate-100"></div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-400 mb-0.5">Kan Grubu</label>
+                                        <select name="blood" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1 text-sm text-slate-100">
+                                            <option value="0 Rh+">0 Rh+</option>
+                                            <option value="0 Rh-">0 Rh-</option>
+                                            <option value="A Rh+">A Rh+</option>
+                                            <option value="A Rh-">A Rh-</option>
+                                            <option value="B Rh+">B Rh+</option>
+                                            <option value="B Rh-">B Rh-</option>
+                                            <option value="AB Rh+">AB Rh+</option>
+                                            <option value="AB Rh-">AB Rh-</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div><label class="block text-xs font-medium text-slate-400 mb-0.5">E-posta</label><input type="email" name="email" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1 text-sm text-slate-100"></div>
+                                <div><label class="block text-xs font-medium text-slate-400 mb-0.5">Şifre</label><input type="password" name="password" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1 text-sm text-slate-100"></div>
+                                <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold py-2 rounded-lg text-sm cursor-pointer mt-1">Kayıt Ol</button>
                             </form>
                         </div>
                     </div>
@@ -869,7 +888,6 @@
             `;
         }
 
-        // İLETİŞİM GÖRÜNÜMÜ - SADECE YÖNETİM KURULU BAŞKANI DÜZENLEME BUTONUNU GÖRÜR
         function renderContactView() {
             const isBaskan = checkIsBaskan(state.currentUser?.role);
             const managementUsers = state.users.filter(u => checkIsYonetim(u.role) || u.role?.toLowerCase().includes('başkan') || u.role?.toLowerCase().includes('sekreter') || u.role?.toLowerCase().includes('sayman'));
@@ -951,7 +969,6 @@
             }
         }
 
-        // SOHBET ODASI GÖRÜNÜMÜ
         function renderChatView() {
             return `
                 <div class="space-y-4 h-[calc(100vh-140px)] flex flex-col">
