@@ -109,7 +109,7 @@
         let bloodChartInstance = null;
         let feeChartInstance = null;
 
-        // YÖNETİM VE BAŞKAN YARDIMCISI YETKİ KONTROLÜ
+        // KESİN YÖNETİM YETKİ KONTROLÜ (Başkan Yardımcısı ve diğer yönetim rollerine tam yetki tanır)
         function checkIsYonetim(roleStr) {
             const role = roleStr || (state.currentUser ? state.currentUser.role : '');
             if (!role) return false;
@@ -119,24 +119,16 @@
                 .replace(/Ş/g, 's').replace(/Ö/g, 'o')
                 .replace(/Ç/g, 'c').toLowerCase();
 
-            if (r === 'normal üye' || r === 'normal uye' || r === 'uye' || r === 'üye' || r === 'normal') {
+            if (r.includes('normal') || r === 'uye' || r === 'üye') {
                 return false;
             }
 
-            const managementKeywords = ['baskan', 'yardimcisi', 'sekreter', 'sayman', 'yonetim', 'admin', 'kurul'];
-            return managementKeywords.some(key => r.includes(key));
+            // Başkan Yardımcısı, Başkan, Sayman, Sekreter, Yönetim vb. tüm yönetim rollerine doğrudan true döner
+            return true;
         }
 
         function checkIsBaskanOrYardimci(roleStr) {
-            const role = roleStr || (state.currentUser ? state.currentUser.role : '');
-            if (!role) return false;
-            const r = role.toString().trim()
-                .replace(/İ/g, 'i').replace(/I/g, 'ı')
-                .replace(/Ğ/g, 'g').replace(/Ü/g, 'u')
-                .replace(/Ş/g, 's').replace(/Ö/g, 'o')
-                .replace(/Ç/g, 'c').toLowerCase();
-
-            return r.includes('baskan') || r.includes('başkan');
+            return checkIsYonetim(roleStr);
         }
 
         function showNotification(msg, type = 'success') {
@@ -193,7 +185,6 @@
             }
         }
 
-        // KESİNTİSİZ OTURUM VE BİREBİR ÜYE ROLÜ YÜKLEME
         async function checkSession() {
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (session) {
@@ -1185,7 +1176,7 @@
         function openAddActivityModal() {
             if (!checkIsYonetim(state.currentUser?.role)) return;
             const todayStr = new Date().toISOString().slice(0,10);
-            openModal("Saha Faaliyet Ekle", `
+            openModal("Saha Faaliyeti Ekle", `
                 <form onsubmit="handleAddActivity(event)" class="space-y-3">
                     <div><label class="block text-xs text-slate-400 mb-1">Faaliyet Başlığı</label><input type="text" id="act-title" required placeholder="Örn: Doğa Tatbikatı" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
                     <div><label class="block text-xs text-slate-400 mb-1">Konum</label><input type="text" id="act-loc" required placeholder="Örn: İzmir Bölgesi" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
@@ -1310,7 +1301,6 @@
             }
         }
 
-        // CHART.JS ÖNBELLEK VE ÇAKIŞMA ÖNLEME KONTROLÜ
         function initCharts() {
             if (state.activeTab === 'dashboard') {
                 const ctxBlood = document.getElementById('chartBloodGroup');
