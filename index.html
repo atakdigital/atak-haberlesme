@@ -349,7 +349,6 @@
             }
         }
 
-        // GÜNCELLENMİŞ KAYIT FONKSİYONU: Telefon ve Kan Grubu Alınıyor
         async function handleRegister(e) {
             e.preventDefault();
             const form = e.target;
@@ -430,7 +429,6 @@
             `;
         }
 
-        // GÜNCELLENMİŞ KAYIT EKRANI: Telefon ve Kan Grubu Alanları Eklendi
         function renderAuthScreen() {
             return `
                 <div class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-red-950">
@@ -610,35 +608,39 @@
             `;
         }
 
+        // AİDAT GÖRÜNÜMÜ - SADECE YÖNETİM EKİBİNE AÇIK (YETKİSİZLER İÇİN KISITLI)
         function renderFeesView() {
             const isY = checkIsYonetim(state.currentUser?.role);
+            if (!isY) {
+                return `
+                    <div class="bg-slate-900 border border-slate-800 p-8 rounded-xl text-center space-y-3">
+                        <i class="fa-solid fa-shield-halved text-4xl text-amber-500"></i>
+                        <h3 class="text-base font-bold text-slate-100">Yetkisiz Erişim</h3>
+                        <p class="text-xs text-slate-400">Aidat yönetimi modülü yalnızca dernek yönetim ekibinin erişimine açıktır.</p>
+                    </div>
+                `;
+            }
+
             const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
             const currentYear = 2026;
             const currentMonthIndex = new Date().getMonth();
-
-            let displayUsers = state.users;
-            if (!isY) {
-                displayUsers = state.users.filter(u => u.id === state.currentUser?.id);
-            }
 
             return `
                 <div class="space-y-6">
                     <div class="flex items-center justify-between">
                         <div>
                             <h2 class="text-lg font-bold text-slate-100">💰 Yıllık Üye Aidat Takibi</h2>
-                            <p class="text-xs text-slate-400">
-                                ${isY ? 'Yönetim Paneli: Tüm üyelerin aidat takibi ve tahsilat işlemleri.' : 'Kişisel Aidat Takibi: Yıllık aidat durumunuz ve ödemeleriniz.'}
-                            </p>
+                            <p class="text-xs text-slate-400">Yönetim Paneli: Tüm üyelerin aidat takibi ve tahsilat işlemleri.</p>
                         </div>
                     </div>
 
                     <div class="space-y-3">
-                        ${displayUsers.length === 0 ? `
+                        ${state.users.length === 0 ? `
                             <div class="bg-slate-900 border border-slate-800 p-6 rounded-xl text-center text-slate-500 italic text-xs">
                                 Üye bilginiz bulunamadı.
                             </div>
-                        ` : displayUsers.map(u => {
-                            const isExpanded = isY ? (state.expandedFeeMemberId === u.id) : (state.expandedFeeMemberId !== u.id);
+                        ` : state.users.map(u => {
+                            const isExpanded = (state.expandedFeeMemberId === u.id);
                             const memberFees = state.fees.filter(f => f.member_id === u.id && f.year === currentYear);
 
                             return `
@@ -689,24 +691,18 @@
                                                         </div>
                                                         <div>
                                                             <div class="text-[11px] ${textStatusColor}">
-                                                                ${isPaid ? `₺${feeRecord.amount}` : (isUnpaidPast ? 'Ödenmedi' : 'Ödenmedi')}
+                                                                ${isPaid ? `₺${feeRecord.amount}` : 'Ödenmedi'}
                                                             </div>
                                                         </div>
                                                         <div>
-                                                            ${isY ? (
-                                                                isPaid ? `
-                                                                    <button onclick="event.stopPropagation(); deleteFeeRecord('${feeRecord.id}')" class="w-full py-1 bg-red-950 hover:bg-red-900 border border-red-800 text-red-300 text-[10px] rounded font-semibold cursor-pointer">
-                                                                        İptal Et
-                                                                    </button>
-                                                                ` : `
-                                                                    <button onclick="event.stopPropagation(); quickAddFee('${u.id}', '${m}', ${currentYear})" class="w-full py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] rounded font-semibold cursor-pointer">
-                                                                        + Tahsil Et
-                                                                    </button>
-                                                                `
-                                                            ) : `
-                                                                <div class="text-[10px] text-slate-500 font-semibold text-center py-1">
-                                                                    ${isPaid ? '✓ Ödeme Alındı' : 'Bekliyor'}
-                                                                </div>
+                                                            ${isPaid ? `
+                                                                <button onclick="event.stopPropagation(); deleteFeeRecord('${feeRecord.id}')" class="w-full py-1 bg-red-950 hover:bg-red-900 border border-red-800 text-red-300 text-[10px] rounded font-semibold cursor-pointer">
+                                                                    İptal Et
+                                                                </button>
+                                                            ` : `
+                                                                <button onclick="event.stopPropagation(); quickAddFee('${u.id}', '${m}', ${currentYear})" class="w-full py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] rounded font-semibold cursor-pointer">
+                                                                    + Tahsil Et
+                                                                </button>
                                                             `}
                                                         </div>
                                                     </div>
@@ -767,9 +763,16 @@
             }
         };
 
+        // DERNEK GİDERLERİ - SADECE YÖNETİM EKİBİNE AÇIK
         function renderExpensesView() {
             if (!checkIsYonetim(state.currentUser?.role)) {
-                return `<div class="bg-slate-900 border border-slate-800 p-8 rounded-xl text-center space-y-3"><i class="fa-solid fa-triangle-exclamation text-3xl text-amber-500"></i><h3 class="text-base font-bold text-slate-100">Yetkisiz Erişim</h3><p class="text-xs text-slate-400">Bu sayfayı görüntüleme yetkiniz bulunmamaktadır.</p></div>`;
+                return `
+                    <div class="bg-slate-900 border border-slate-800 p-8 rounded-xl text-center space-y-3">
+                        <i class="fa-solid fa-shield-halved text-4xl text-amber-500"></i>
+                        <h3 class="text-base font-bold text-slate-100">Yetkisiz Erişim</h3>
+                        <p class="text-xs text-slate-400">Dernek giderleri modülü yalnızca dernek yönetim ekibinin erişimine açıktır.</p>
+                    </div>
+                `;
             }
             const totalExpenses = state.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
             return `
