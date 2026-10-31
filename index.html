@@ -91,6 +91,12 @@
             repeaters: [],
             reports: [],
             chatMessages: [],
+            contactInfo: {
+                center: 'İzmir, Türkiye',
+                emergency_channel: '439.2625 MHz',
+                field_freq: '433.475 MHz',
+                email: 'iletisim@atakhaberlesme.org'
+            },
             disasterMode: false,
             userAcknowledgedDisaster: false,
             activeTab: 'dashboard',
@@ -100,6 +106,7 @@
 
         let alarmInterval = null;
         let globalAudioCtx = null;
+        let realtimeChannel = null;
 
         function checkIsYonetim(roleStr) {
             const role = roleStr || (state.currentUser ? state.currentUser.role : '');
@@ -116,6 +123,19 @@
 
             const managementKeywords = ['baskan', 'sekreter', 'sayman', 'yonetim', 'admin', 'kurul'];
             return managementKeywords.some(key => r.includes(key));
+        }
+
+        // SADECE YÖNETİM KURULU BAŞKANI KONTROLÜ
+        function checkIsBaskan(roleStr) {
+            const role = roleStr || (state.currentUser ? state.currentUser.role : '');
+            if (!role) return false;
+            const r = role.toString().trim()
+                .replace(/İ/g, 'i').replace(/I/g, 'ı')
+                .replace(/Ğ/g, 'g').replace(/Ü/g, 'u')
+                .replace(/Ş/g, 's').replace(/Ö/g, 'o')
+                .replace(/Ç/g, 'c').toLowerCase();
+
+            return r.includes('baskan') || r.includes('başkan');
         }
 
         function showNotification(msg, type = 'success') {
@@ -191,7 +211,7 @@
 
         async function fetchAllData() {
             try {
-                const [mRes, dRes, expRes, aRes, rRes, repRes, repPortRes, chatRes, sysRes] = await Promise.all([
+                const [mRes, dRes, expRes, aRes, rRes, repRes, repPortRes, chatRes, sysRes, contactRes] = await Promise.all([
                     supabaseClient.from('members').select('*'),
                     supabaseClient.from('dues').select('*, members(full_name)'),
                     supabaseClient.from('expenses').select('*'),
@@ -200,7 +220,8 @@
                     supabaseClient.from('repeaters').select('*'),
                     supabaseClient.from('reports').select('*'),
                     supabaseClient.from('chat_messages').select('*').order('created_at', { ascending: true }),
-                    supabaseClient.from('system_settings').select('*').eq('key', 'disaster_mode').single()
+                    supabaseClient.from('system_settings').select('*').eq('key', 'disaster_mode').single(),
+                    supabaseClient.from('system_settings').select('*').eq('key', 'contact_info').single()
                 ]);
 
                 if (mRes.data) state.users = mRes.data;
@@ -219,6 +240,11 @@
                 if (repRes.data) state.repeaters = repRes.data;
                 if (repPortRes.data) state.reports = repPortRes.data;
                 if (chatRes.data) state.chatMessages = chatRes.data;
+                if (contactRes.data && contactRes.data.value) {
+                    try {
+                        state.contactInfo = JSON.parse(contactRes.data.value);
+                    } catch(e) {}
+                }
                 
                 const prevDisasterState = state.disasterMode;
                 if (sysRes.data) state.disasterMode = sysRes.data.value === 'true';
@@ -236,31 +262,48 @@
         }
 
         function initRealtimeListener() {
-            const channel = supabaseClient.channel('db-changes');
+            if (realtimeChannel) {
+                supabaseClient.removeChannel(realtimeChannel);
+            }
 
-            ['members', 'dues', 'expenses', 'field_activities', 'announcements', 'system_settings', 'repeaters', 'reports', 'chat_messages'].forEach(tableName => {
-                channel.on(
-                    'postgres_changes',
-                    { event: '*', schema: 'public', table: tableName },
-                    async (payload) => {
-                        if (tableName === 'system_settings' && payload.new && payload.new.key === 'disaster_mode') {
-                            const newStatus = payload.new.value === 'true';
-                            if (!state.disasterMode && newStatus) {
-                                state.userAcknowledgedDisaster = false;
-                                startRepeatingAlarm();
-                            } else if (!newStatus) {
-                                stopRepeatingAlarm();
-                                state.userAcknowledgedDisaster = false;
-                            }
-                            state.disasterMode = newStatus;
-                        }
-                        await fetchAllData();
+            realtimeChannel = supabaseClient.channel('global-live-channel')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, async (payload) => {
+                    if (payload.eventType === 'INSERT') {
+                        state.chatMessages.push(payload.new);
+                        render();
+                        const container = document.getElementById('chat-messages-container');
+                        if (container) container.scrollTop = container.scrollHeight;
+                    } else {
+                        const { data } = await supabaseClient.from('chat_messages').select('*').order('created_at', { ascending: true });
+                        if (data) state.chatMessages = data;
                         render();
                     }
-                );
-            });
-
-            channel.subscribe();
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'system_settings' }, async (payload) => {
+                    if (payload.new && payload.new.key === 'disaster_mode') {
+                        const newStatus = payload.new.value === 'true';
+                        if (!state.disasterMode && newStatus) {
+                            state.userAcknowledgedDisaster = false;
+                            startRepeatingAlarm();
+                        } else if (!newStatus) {
+                            stopRepeatingAlarm();
+                            state.userAcknowledgedDisaster = false;
+                        }
+                        state.disasterMode = newStatus;
+                    }
+                    if (payload.new && payload.new.key === 'contact_info') {
+                        try { state.contactInfo = JSON.parse(payload.new.value); } catch(e){}
+                    }
+                    render();
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, async () => { await fetchAllData(); render(); })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'dues' }, async () => { await fetchAllData(); render(); })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, async () => { await fetchAllData(); render(); })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'repeaters' }, async () => { await fetchAllData(); render(); })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, async () => { await fetchAllData(); render(); })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'field_activities' }, async () => { await fetchAllData(); render(); })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, async () => { await fetchAllData(); render(); })
+                .subscribe();
         }
 
         async function toggleDisasterMode() {
@@ -368,7 +411,7 @@
                             <p class="text-xs text-slate-400 leading-relaxed">Dernek yönetimi tarafından olağanüstü afet durumu ilan edilmiştir. Lütfen telsizlerinizi ilgili acil durum frekanslarına ayarlayın ve operasyon talimatlarını bekleyin.</p>
                         </div>
                         <div class="p-4 bg-red-950/60 border border-red-800 rounded-xl text-red-300 text-xs font-mono font-bold">
-                            AKTİF ÇAĞRI KANALI: 439.2625 MHz / SAHA FREKANSI: 433.475 MHz
+                            AKTİF ÇAĞRI KANALI: ${state.contactInfo.emergency_channel} / SAHA FREKANSI: ${state.contactInfo.field_freq}
                         </div>
                         
                         <button onclick="window.acknowledgeDisaster()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3.5 rounded-xl text-sm transition shadow-lg shadow-red-600/50 cursor-pointer flex items-center justify-center space-x-2">
@@ -430,7 +473,7 @@
                         </div>
                         ${isY ? `
                             <button onclick="toggleDisasterMode()" class="ml-6 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-2 ${state.disasterMode ? 'bg-red-600 text-white disaster-pulse animate-bounce' : 'bg-red-950/40 text-red-400 border border-red-800'} cursor-pointer">
-                                <i class="fa-solid fa-triangle-exclamation"><span>${state.disasterMode ? 'AFET MODU AKTİF (KAPAT)' : 'AFET MODUNU TETİKLE'}</span></i>
+                                <i class="fa-solid fa-triangle-exclamation"></i><span>${state.disasterMode ? 'AFET MODU AKTİF (KAPAT)' : 'AFET MODUNU TETİKLE'}</span>
                             </button>
                         ` : ''}
                     </div>
@@ -445,7 +488,6 @@
             `;
         }
 
-        // GÜNCELLENMİŞ SOL MENÜ: Duyurular Altına "İletişim" ve "Sohbet Odası" Eklendi
         function renderSidebar() {
             const isY = checkIsYonetim(state.currentUser?.role);
             let tabs = [
@@ -827,23 +869,28 @@
             `;
         }
 
-        // YENİ EKLENEN İLETİŞİM GÖRÜNÜMÜ
+        // İLETİŞİM GÖRÜNÜMÜ - SADECE YÖNETİM KURULU BAŞKANI DÜZENLEME BUTONUNU GÖRÜR
         function renderContactView() {
+            const isBaskan = checkIsBaskan(state.currentUser?.role);
             const managementUsers = state.users.filter(u => checkIsYonetim(u.role) || u.role?.toLowerCase().includes('başkan') || u.role?.toLowerCase().includes('sekreter') || u.role?.toLowerCase().includes('sayman'));
+            
             return `
                 <div class="space-y-6">
-                    <div>
-                        <h2 class="text-lg font-bold text-slate-100">📞 İletişim & Dernek Yetkilileri</h2>
-                        <p class="text-xs text-slate-400">Dernek yönetimi ve iletişim bilgileri</p>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-100">📞 İletişim & Dernek Yetkilileri</h2>
+                            <p class="text-xs text-slate-400">Dernek yönetimi ve iletişim bilgileri</p>
+                        </div>
+                        ${isBaskan ? `<button onclick="openEditContactModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer shadow-md shadow-red-600/30 flex items-center space-x-1.5"><i class="fa-solid fa-pen-to-square"></i><span>Bilgileri Düzenle</span></button>` : ''}
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-3">
                             <h4 class="font-bold text-red-500 text-sm">Merkez İletişim Bilgileri</h4>
                             <div class="text-xs text-slate-300 space-y-2">
-                                <p><strong class="text-slate-100">Dernek Merkezi:</strong> İzmir, Türkiye</p>
-                                <p><strong class="text-slate-100">Acil Telsiz Çağrı Kanalı:</strong> 439.2625 MHz</p>
-                                <p><strong class="text-slate-100">Saha Frekansı:</strong> 433.475 MHz</p>
-                                <p><strong class="text-slate-100">E-posta:</strong> iletisim@atakhaberlesme.org</p>
+                                <p><strong class="text-slate-100">Dernek Merkezi:</strong> ${state.contactInfo.center}</p>
+                                <p><strong class="text-slate-100">Acil Telsiz Çağrı Kanalı:</strong> ${state.contactInfo.emergency_channel}</p>
+                                <p><strong class="text-slate-100">Saha Frekansı:</strong> ${state.contactInfo.field_freq}</p>
+                                <p><strong class="text-slate-100">E-posta:</strong> ${state.contactInfo.email}</p>
                             </div>
                         </div>
                         <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-3">
@@ -868,7 +915,43 @@
             `;
         }
 
-        // YENİ EKLENEN SOHBET ODASI GÖRÜNÜMÜ (Anlık Chat)
+        function openEditContactModal() {
+            if (!checkIsBaskan(state.currentUser?.role)) return;
+            openModal("İletişim Bilgilerini Düzenle", `
+                <form onsubmit="handleSaveContactInfo(event)" class="space-y-3">
+                    <div><label class="block text-xs text-slate-400 mb-1">Dernek Merkezi</label><input type="text" id="cnt-center" required value="${state.contactInfo.center || ''}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Acil Telsiz Çağrı Kanalı</label><input type="text" id="cnt-emer" required value="${state.contactInfo.emergency_channel || ''}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Saha Frekansı</label><input type="text" id="cnt-field" required value="${state.contactInfo.field_freq || ''}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">E-posta</label><input type="email" id="cnt-email" required value="${state.contactInfo.email || ''}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer mt-2">Güncelle ve Kaydet</button>
+                </form>
+            `);
+        }
+
+        async function handleSaveContactInfo(e) {
+            e.preventDefault();
+            if (!checkIsBaskan(state.currentUser?.role)) return;
+            const newContact = {
+                center: document.getElementById('cnt-center').value,
+                emergency_channel: document.getElementById('cnt-emer').value,
+                field_freq: document.getElementById('cnt-field').value,
+                email: document.getElementById('cnt-email').value
+            };
+
+            const jsonStr = JSON.stringify(newContact);
+            const { error } = await supabaseClient.from('system_settings').upsert({ key: 'contact_info', value: jsonStr });
+            
+            if (error) {
+                showNotification("Güncelleme Hatası: " + error.message, 'danger');
+            } else {
+                state.contactInfo = newContact;
+                showNotification("İletişim bilgileri başarıyla güncellendi.");
+                closeModal();
+                render();
+            }
+        }
+
+        // SOHBET ODASI GÖRÜNÜMÜ
         function renderChatView() {
             return `
                 <div class="space-y-4 h-[calc(100vh-140px)] flex flex-col">
@@ -918,21 +1001,18 @@
             const message = input.value.trim();
             if (!message) return;
 
-            const { error } = await supabaseClient.from('chat_messages').insert([{
+            const newMsg = {
                 sender_id: state.currentUser.id,
                 sender_name: `${state.currentUser.full_name} (${state.currentUser.callsign || 'TA1XXX'})`,
                 message: message
-            }]);
+            };
+
+            input.value = '';
+
+            const { error } = await supabaseClient.from('chat_messages').insert([newMsg]);
 
             if (error) {
                 showNotification("Mesaj gönderilemedi: " + error.message, 'danger');
-            } else {
-                input.value = '';
-                await fetchAllData();
-                render();
-                // Aşağı kaydır
-                const container = document.getElementById('chat-messages-container');
-                if (container) container.scrollTop = container.scrollHeight;
             }
         }
 
@@ -1190,7 +1270,6 @@
             `;
             setTimeout(initCharts, 50);
 
-            // Sohbet odasındaysa scroll'u en aşağıya indir
             if (state.activeTab === 'chat') {
                 const container = document.getElementById('chat-messages-container');
                 if (container) container.scrollTop = container.scrollHeight;
