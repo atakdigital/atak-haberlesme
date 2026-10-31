@@ -93,7 +93,8 @@
             disasterMode: false,
             userAcknowledgedDisaster: false,
             activeTab: 'dashboard',
-            notification: null
+            notification: null,
+            expandedFeeMemberId: null // Açık olan üyenin ID'si (Açılır kapanır sekme için)
         };
 
         let alarmInterval = null;
@@ -203,6 +204,7 @@
                 if (mRes.data) state.users = mRes.data;
                 if (dRes.data) state.fees = dRes.data.map(d => ({
                     id: d.id,
+                    member_id: d.member_id,
                     memberName: d.members?.full_name || 'Üye',
                     amount: d.amount,
                     month: d.month || 'Ocak',
@@ -541,84 +543,136 @@
             `;
         }
 
+        // YENİ: Açılır Kapanır Üye Bazlı 12 Aylık Aidat Görünümü
         function renderFeesView() {
             if (!checkIsYonetim(state.currentUser?.role)) {
                 return `<div class="bg-slate-900 border border-slate-800 p-8 rounded-xl text-center space-y-3"><i class="fa-solid fa-triangle-exclamation text-3xl text-amber-500"></i><h3 class="text-base font-bold text-slate-100">Yetkisiz Erişim</h3><p class="text-xs text-slate-400">Bu sayfayı görüntüleme yetkiniz bulunmamaktadır.</p></div>`;
             }
 
-            // Aidatları üyelere göre gruplayalım
-            const memberFeesMap = {};
-
-            state.fees.forEach(f => {
-                if (!memberFeesMap[f.memberName]) {
-                    memberFeesMap[f.memberName] = {
-                        memberName: f.memberName,
-                        totalAmount: 0,
-                        records: []
-                    };
-                }
-                memberFeesMap[f.memberName].totalAmount += (f.amount || 0);
-                memberFeesMap[f.memberName].records.push(f);
-            });
-
-            const groupedMembers = Object.values(memberFeesMap);
+            const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+            const currentYear = 2026;
 
             return `
-                <div class="space-y-8">
+                <div class="space-y-6">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h2 class="text-lg font-bold text-slate-100">💰 Aylık Aidat Yönetimi</h2>
-                            <p class="text-xs text-slate-400">Üye bazlı ödenen aidatlar ve dönem takibi</p>
+                            <h2 class="text-lg font-bold text-slate-100">💰 Yıllık Üye Aidat Takibi (12 Ay Görünümü)</h2>
+                            <p class="text-xs text-slate-400">Bir üyenin üzerine tıklayarak 1 yıllık aidat durumunu açıp kapatabilir, aylar üzerine tıklayarak ödeme ekleyip silebilirsiniz.</p>
                         </div>
-                        <button onclick="openAddDueModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Aidat Tahsil Et</button>
                     </div>
 
                     <div class="space-y-3">
-                        <h3 class="font-bold text-slate-200 text-sm">Üye Ödeme Listesi</h3>
-                        <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
-                            <table class="w-full text-left text-xs text-slate-300">
-                                <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
-                                    <tr>
-                                        <th class="px-4 py-3">Üye Adı</th>
-                                        <th class="px-4 py-3">Ödenen Aylar & Dönemler</th>
-                                        <th class="px-4 py-3">Toplam Ödenen Tutar</th>
-                                        <th class="px-4 py-3 text-right">İşlemler</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-800">
-                                    ${groupedMembers.length === 0 ? `
-                                        <tr>
-                                            <td colspan="4" class="px-4 py-6 text-center text-slate-500 italic">Henüz ödenmiş aidat kaydı bulunmuyor.</td>
-                                        </tr>
-                                    ` : groupedMembers.map(m => `
-                                        <tr class="hover:bg-slate-800/50">
-                                            <td class="px-4 py-3 font-semibold text-slate-100 align-top">${m.memberName}</td>
-                                            <td class="px-4 py-3 align-top">
-                                                <div class="flex flex-wrap gap-1.5">
-                                                    ${m.records.map(rec => `
-                                                        <span class="inline-flex items-center gap-1.5 bg-slate-950 border border-slate-800 text-blue-400 px-2 py-1 rounded-md text-[11px] font-medium">
-                                                            <span>${rec.month} ${rec.year}</span>
-                                                            <span class="text-emerald-400 font-bold">₺${rec.amount}</span>
-                                                            <button onclick="deleteDue('${rec.id}')" class="text-slate-500 hover:text-red-400 ml-1 cursor-pointer" title="Bu kaydı sil">
-                                                                <i class="fa-solid fa-xmark text-[10px]"></i>
-                                                            </button>
-                                                        </span>
-                                                    `).join('')}
-                                                </div>
-                                            </td>
-                                            <td class="px-4 py-3 text-emerald-400 font-bold align-top">₺${m.totalAmount.toLocaleString()}</td>
-                                            <td class="px-4 py-3 text-right align-top">
-                                                <span class="text-[10px] text-slate-500 italic">${m.records.length} Dönem Ödendi</span>
-                                            </td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
+                        ${state.users.map(u => {
+                            const isExpanded = state.expandedFeeMemberId === u.id;
+                            // Bu üyeye ait 2026 yılı ödemeleri
+                            const memberFees = state.fees.filter(f => f.member_id === u.id && f.year === currentYear);
+
+                            return `
+                                <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-md transition">
+                                    <!-- Üye Ana Satırı (Tıklanınca Açılır/Kapanır) -->
+                                    <div onclick="toggleFeeAccordion('${u.id}')" class="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-800/50">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-9 h-9 rounded-lg bg-red-950 border border-red-800 text-red-400 flex items-center justify-center font-bold text-xs">
+                                                ${u.callsign || 'TA'}
+                                            </div>
+                                            <div>
+                                                <h4 class="font-bold text-slate-100 text-sm">${u.full_name}</h4>
+                                                <p class="text-[11px] text-slate-400">${u.role} • ${u.email}</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center space-x-4">
+                                            <span class="text-xs text-slate-400 font-medium">Yıl: <strong class="text-slate-200">${currentYear}</strong></span>
+                                            <i class="fa-solid fa-chevron-down text-slate-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}"></i>
+                                        </div>
+                                    </div>
+
+                                    <!-- Açılır Kapanır 12 Aylık Izgara (Accordion Content) -->
+                                    ${isExpanded ? `
+                                        <div class="bg-slate-950 p-4 border-t border-slate-800 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                                            ${months.map(m => {
+                                                const feeRecord = memberFees.find(f => f.month === m);
+                                                const isPaid = !!feeRecord;
+
+                                                return `
+                                                    <div class="p-3 rounded-xl border flex flex-col justify-between space-y-2 ${isPaid ? 'bg-emerald-950/40 border-emerald-800/60' : 'bg-slate-900 border-slate-800'}">
+                                                        <div class="flex items-center justify-between">
+                                                            <span class="text-xs font-bold ${isPaid ? 'text-emerald-400' : 'text-slate-300'}">${m}</span>
+                                                            <span class="w-2 h-2 rounded-full ${isPaid ? 'bg-emerald-500 shadow-md shadow-emerald-500/50' : 'bg-slate-600'}"></span>
+                                                        </div>
+                                                        <div>
+                                                            <div class="text-[11px] font-bold ${isPaid ? 'text-emerald-300' : 'text-slate-500'}">
+                                                                ${isPaid ? `₺${feeRecord.amount}` : 'Ödenmedi'}
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            ${isPaid ? `
+                                                                <button onclick="event.stopPropagation(); deleteFeeRecord('${feeRecord.id}')" class="w-full py-1 bg-red-950 hover:bg-red-900 border border-red-800 text-red-300 text-[10px] rounded font-semibold cursor-pointer">
+                                                                    İptal Et
+                                                                >
+                                                            ` : `
+                                                                <button onclick="event.stopPropagation(); quickAddFee('${u.id}', '${m}', ${currentYear})" class="w-full py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] rounded font-semibold cursor-pointer">
+                                                                    + Tahsil Et
+                                                                </button>
+                                                            `}
+                                                        </div>
+                                                    </div>
+                                                `;
+                                            }).join('')}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
                 </div>
             `;
         }
+
+        // Açılır kapanır akordiyon fonksiyonu
+        window.toggleFeeAccordion = function(memberId) {
+            if (state.expandedFeeMemberId === memberId) {
+                state.expandedFeeMemberId = null;
+            } else {
+                state.expandedFeeMemberId = memberId;
+            }
+            render();
+        };
+
+        // Hızlı Aidat Ekleme (1 Tıkla)
+        window.quickAddFee = async function(memberId, month, year) {
+            const amount = prompt("Tahsilat tutarını girin (₺):", "500");
+            if (!amount) return;
+
+            const { error } = await supabaseClient.from('dues').insert([{
+                member_id: memberId,
+                month: month,
+                year: year,
+                amount: parseFloat(amount),
+                status: 'Ödendi'
+            }]);
+
+            if (error) {
+                showNotification("Aidat ekleme hatası: " + error.message, 'danger');
+            } else {
+                showNotification(`${month} ayı aidatı başarıyla tahsil edildi.`);
+                await fetchAllData();
+                render();
+            }
+        };
+
+        // Aidat Kaydını Silme
+        window.deleteFeeRecord = async function(feeId) {
+            if (!confirm("Bu aya ait aidat kaydını silmek/iptal etmek istediğinize emin misiniz?")) return;
+
+            const { error } = await supabaseClient.from('dues').delete().eq('id', feeId);
+            if (error) {
+                showNotification("Silme hatası: " + error.message, 'danger');
+            } else {
+                showNotification("Aidat kaydı kaldırıldı.", "info");
+                await fetchAllData();
+                render();
+            }
+        };
 
         function renderExpensesView() {
             if (!checkIsYonetim(state.currentUser?.role)) {
@@ -792,58 +846,6 @@
             render();
         }
 
-        async function openAddDueModal() {
-            if (!checkIsYonetim(state.currentUser?.role)) return;
-            const { data: members } = await supabaseClient.from('members').select('id, full_name');
-            const opts = members ? members.map(m => `<option value="${m.id}">${m.full_name}</option>`).join('') : '';
-            const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
-            
-            openModal("Aylık Aidat Tahsilatı", `
-                <form onsubmit="handleAddDue(event)" class="space-y-3">
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Üye Seçin</label>
-                        <select id="due-member" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">${opts}</select>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-xs text-slate-400 mb-1">Aidat Ayı</label>
-                            <select id="due-month" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
-                                ${months.map(m => `<option>${m}</option>`).join('')}
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs text-slate-400 mb-1">Yıl</label>
-                            <input type="number" id="due-year" value="2026" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Tutar (₺)</label>
-                        <input type="number" id="due-amount" required value="500" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">
-                    </div>
-                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer mt-2">Aidat Ödemesini Kaydet</button>
-                </form>
-            `);
-        }
-
-        async function handleAddDue(e) {
-            e.preventDefault();
-            if (!checkIsYonetim(state.currentUser?.role)) return;
-            const member_id = document.getElementById('due-member').value;
-            const month = document.getElementById('due-month').value;
-            const year = parseInt(document.getElementById('due-year').value);
-            const amount = parseFloat(document.getElementById('due-amount').value);
-
-            const { error } = await supabaseClient.from('dues').insert([{ member_id, month, year, amount, status: 'Ödendi' }]);
-            if (error) {
-                showNotification("Aidat Ekleme Hatası: " + error.message, 'danger');
-            } else {
-                showNotification("Aylık aidat başarıyla kaydedildi.");
-                closeModal();
-                await fetchAllData();
-                render();
-            }
-        }
-
         function openAddExpenseModal() {
             if (!checkIsYonetim(state.currentUser?.role)) return;
             openModal("Dernek Gideri Ekle", `
@@ -958,7 +960,6 @@
                 showNotification("Üye sistemden silindi.", "info");
             }
         };
-        window.deleteDue = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('dues').delete().eq('id', id); await fetchAllData(); render(); } };
         window.deleteExpense = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('expenses').delete().eq('id', id); await fetchAllData(); render(); showNotification("Gider silindi.", "info"); } };
         window.deleteRepeater = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('repeaters').delete().eq('id', id); await fetchAllData(); render(); } };
         window.deleteReport = async (id) => { if(checkIsYonetim(state.currentUser?.role)) { await supabaseClient.from('reports').delete().eq('id', id); await fetchAllData(); render(); } };
