@@ -108,7 +108,7 @@
         let globalAudioCtx = null;
         let realtimeChannel = null;
 
-        // GÜÇLENDİRİLMİŞ YÖNETİM KONTROLÜ (Başkan Yardımcısı, Başkan, Sekreter, Sayman vb. sorunsuz tanınır)
+        // GÜNCELLENMİŞ KESİN YÖNETİM KONTROLÜ (Başkan Yardımcısı, Sayman vb. kelimeleri eksiksiz yakalar)
         function checkIsYonetim(roleStr) {
             const role = roleStr || (state.currentUser ? state.currentUser.role : '');
             if (!role) return false;
