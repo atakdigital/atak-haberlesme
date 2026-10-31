@@ -94,7 +94,7 @@
             userAcknowledgedDisaster: false,
             activeTab: 'dashboard',
             notification: null,
-            expandedFeeMemberId: null // Açık olan üyenin ID'si (Açılır kapanır sekme için)
+            expandedFeeMemberId: null
         };
 
         let alarmInterval = null;
@@ -543,7 +543,7 @@
             `;
         }
 
-        // YENİ: Açılır Kapanır Üye Bazlı 12 Aylık Aidat Görünümü
+        // AİDAT GÖRÜNÜMÜ: İsim/Soyisim düzeltildi & Geçmiş aylar ödenmemişse kırmızı renk
         function renderFeesView() {
             if (!checkIsYonetim(state.currentUser?.role)) {
                 return `<div class="bg-slate-900 border border-slate-800 p-8 rounded-xl text-center space-y-3"><i class="fa-solid fa-triangle-exclamation text-3xl text-amber-500"></i><h3 class="text-base font-bold text-slate-100">Yetkisiz Erişim</h3><p class="text-xs text-slate-400">Bu sayfayı görüntüleme yetkiniz bulunmamaktadır.</p></div>`;
@@ -551,33 +551,33 @@
 
             const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
             const currentYear = 2026;
+            const currentMonthIndex = new Date().getMonth(); // 0: Ocak, 9: Ekim (2026-10 itibarıyla)
 
             return `
                 <div class="space-y-6">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h2 class="text-lg font-bold text-slate-100">💰 Yıllık Üye Aidat Takibi (12 Ay Görünümü)</h2>
-                            <p class="text-xs text-slate-400">Bir üyenin üzerine tıklayarak 1 yıllık aidat durumunu açıp kapatabilir, aylar üzerine tıklayarak ödeme ekleyip silebilirsiniz.</p>
+                            <h2 class="text-lg font-bold text-slate-100">💰 Yıllık Üye Aidat Takibi</h2>
+                            <p class="text-xs text-slate-400">Yeni üyeler otomatik listelenir. Geçmiş ödenmeyen aylar kırmızı renkle vurgulanır.</p>
                         </div>
                     </div>
 
                     <div class="space-y-3">
                         ${state.users.map(u => {
                             const isExpanded = state.expandedFeeMemberId === u.id;
-                            // Bu üyeye ait 2026 yılı ödemeleri
                             const memberFees = state.fees.filter(f => f.member_id === u.id && f.year === currentYear);
 
                             return `
                                 <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-md transition">
-                                    <!-- Üye Ana Satırı (Tıklanınca Açılır/Kapanır) -->
+                                    <!-- Üye Ana Satırı (İsim Soyisim ve Ad Soyad Düzenlemesi) -->
                                     <div onclick="toggleFeeAccordion('${u.id}')" class="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-800/50">
                                         <div class="flex items-center space-x-3">
-                                            <div class="w-9 h-9 rounded-lg bg-red-950 border border-red-800 text-red-400 flex items-center justify-center font-bold text-xs">
-                                                ${u.callsign || 'TA'}
+                                            <div class="w-9 h-9 rounded-lg bg-red-950 border border-red-800 text-red-400 flex items-center justify-center font-bold text-xs shrink-0">
+                                                <i class="fa-solid fa-user"></i>
                                             </div>
                                             <div>
                                                 <h4 class="font-bold text-slate-100 text-sm">${u.full_name}</h4>
-                                                <p class="text-[11px] text-slate-400">${u.role} • ${u.email}</p>
+                                                <p class="text-[11px] text-slate-400">${u.role} • <span class="text-red-400 font-mono font-bold">${u.callsign || 'TA1XXX'}</span></p>
                                             </div>
                                         </div>
                                         <div class="flex items-center space-x-4">
@@ -586,29 +586,46 @@
                                         </div>
                                     </div>
 
-                                    <!-- Açılır Kapanır 12 Aylık Izgara (Accordion Content) -->
+                                    <!-- 12 Ay Izgarası (Geçmiş Ay Kontrolü ve Kırmızı Vurgu) -->
                                     ${isExpanded ? `
                                         <div class="bg-slate-950 p-4 border-t border-slate-800 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                                            ${months.map(m => {
+                                            ${months.map((m, mIndex) => {
                                                 const feeRecord = memberFees.find(f => f.month === m);
                                                 const isPaid = !!feeRecord;
+                                                // Eğer ödenmemişse VE geçmiş bir aysa (veya şimdiki ay) kırmızı yapalım
+                                                const isPastOrCurrentMonth = mIndex <= currentMonthIndex;
+                                                const isUnpaidPast = !isPaid && isPastOrCurrentMonth;
+
+                                                let cardBg = 'bg-slate-900 border-slate-800';
+                                                let textStatusColor = 'text-slate-500';
+                                                let dotColor = 'bg-slate-600';
+
+                                                if (isPaid) {
+                                                    cardBg = 'bg-emerald-950/40 border-emerald-800/60';
+                                                    textStatusColor = 'text-emerald-300';
+                                                    dotColor = 'bg-emerald-500 shadow-md shadow-emerald-500/50';
+                                                } else if (isUnpaidPast) {
+                                                    cardBg = 'bg-red-950/50 border-red-800/80 shadow-lg shadow-red-900/30';
+                                                    textStatusColor = 'text-red-400 font-bold';
+                                                    dotColor = 'bg-red-500 animate-pulse';
+                                                }
 
                                                 return `
-                                                    <div class="p-3 rounded-xl border flex flex-col justify-between space-y-2 ${isPaid ? 'bg-emerald-950/40 border-emerald-800/60' : 'bg-slate-900 border-slate-800'}">
+                                                    <div class="p-3 rounded-xl border flex flex-col justify-between space-y-2 ${cardBg}">
                                                         <div class="flex items-center justify-between">
-                                                            <span class="text-xs font-bold ${isPaid ? 'text-emerald-400' : 'text-slate-300'}">${m}</span>
-                                                            <span class="w-2 h-2 rounded-full ${isPaid ? 'bg-emerald-500 shadow-md shadow-emerald-500/50' : 'bg-slate-600'}"></span>
+                                                            <span class="text-xs font-bold ${isPaid ? 'text-emerald-400' : isUnpaidPast ? 'text-red-400' : 'text-slate-300'}">${m}</span>
+                                                            <span class="w-2 h-2 rounded-full ${dotColor}"></span>
                                                         </div>
                                                         <div>
-                                                            <div class="text-[11px] font-bold ${isPaid ? 'text-emerald-300' : 'text-slate-500'}">
-                                                                ${isPaid ? `₺${feeRecord.amount}` : 'Ödenmedi'}
+                                                            <div class="text-[11px] ${textStatusColor}">
+                                                                ${isPaid ? `₺${feeRecord.amount}` : (isUnpaidPast ? 'Ödenmedi (Geçmiş)' : 'Ödenmedi')}
                                                             </div>
                                                         </div>
                                                         <div>
                                                             ${isPaid ? `
                                                                 <button onclick="event.stopPropagation(); deleteFeeRecord('${feeRecord.id}')" class="w-full py-1 bg-red-950 hover:bg-red-900 border border-red-800 text-red-300 text-[10px] rounded font-semibold cursor-pointer">
                                                                     İptal Et
-                                                                >
+                                                                </button>
                                                             ` : `
                                                                 <button onclick="event.stopPropagation(); quickAddFee('${u.id}', '${m}', ${currentYear})" class="w-full py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] rounded font-semibold cursor-pointer">
                                                                     + Tahsil Et
@@ -628,7 +645,6 @@
             `;
         }
 
-        // Açılır kapanır akordiyon fonksiyonu
         window.toggleFeeAccordion = function(memberId) {
             if (state.expandedFeeMemberId === memberId) {
                 state.expandedFeeMemberId = null;
@@ -638,7 +654,6 @@
             render();
         };
 
-        // Hızlı Aidat Ekleme (1 Tıkla)
         window.quickAddFee = async function(memberId, month, year) {
             const amount = prompt("Tahsilat tutarını girin (₺):", "500");
             if (!amount) return;
@@ -660,7 +675,6 @@
             }
         };
 
-        // Aidat Kaydını Silme
         window.deleteFeeRecord = async function(feeId) {
             if (!confirm("Bu aya ait aidat kaydını silmek/iptal etmek istediğinize emin misiniz?")) return;
 
