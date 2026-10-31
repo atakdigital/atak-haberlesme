@@ -545,32 +545,71 @@
             if (!checkIsYonetim(state.currentUser?.role)) {
                 return `<div class="bg-slate-900 border border-slate-800 p-8 rounded-xl text-center space-y-3"><i class="fa-solid fa-triangle-exclamation text-3xl text-amber-500"></i><h3 class="text-base font-bold text-slate-100">Yetkisiz Erişim</h3><p class="text-xs text-slate-400">Bu sayfayı görüntüleme yetkiniz bulunmamaktadır.</p></div>`;
             }
+
+            // Aidatları üyelere göre gruplayalım
+            const memberFeesMap = {};
+
+            state.fees.forEach(f => {
+                if (!memberFeesMap[f.memberName]) {
+                    memberFeesMap[f.memberName] = {
+                        memberName: f.memberName,
+                        totalAmount: 0,
+                        records: []
+                    };
+                }
+                memberFeesMap[f.memberName].totalAmount += (f.amount || 0);
+                memberFeesMap[f.memberName].records.push(f);
+            });
+
+            const groupedMembers = Object.values(memberFeesMap);
+
             return `
                 <div class="space-y-8">
                     <div class="flex items-center justify-between">
                         <div>
                             <h2 class="text-lg font-bold text-slate-100">💰 Aylık Aidat Yönetimi</h2>
-                            <p class="text-xs text-slate-400">Üye ödemelerinin takibi</p>
+                            <p class="text-xs text-slate-400">Üye bazlı ödenen aidatlar ve dönem takibi</p>
                         </div>
                         <button onclick="openAddDueModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Aidat Tahsil Et</button>
                     </div>
 
                     <div class="space-y-3">
-                        <h3 class="font-bold text-slate-200 text-sm">Aidat Listesi</h3>
+                        <h3 class="font-bold text-slate-200 text-sm">Üye Ödeme Listesi</h3>
                         <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
                             <table class="w-full text-left text-xs text-slate-300">
                                 <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
-                                    <tr><th class="px-4 py-3">Üye Adı</th><th class="px-4 py-3">Ay</th><th class="px-4 py-3">Yıl</th><th class="px-4 py-3">Tutar</th><th class="px-4 py-3">Durum</th><th class="px-4 py-3 text-right">İşlem</th></tr>
+                                    <tr>
+                                        <th class="px-4 py-3">Üye Adı</th>
+                                        <th class="px-4 py-3">Ödenen Aylar & Dönemler</th>
+                                        <th class="px-4 py-3">Toplam Ödenen Tutar</th>
+                                        <th class="px-4 py-3 text-right">İşlemler</th>
+                                    </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-800">
-                                    ${state.fees.map(f => `
+                                    ${groupedMembers.length === 0 ? `
+                                        <tr>
+                                            <td colspan="4" class="px-4 py-6 text-center text-slate-500 italic">Henüz ödenmiş aidat kaydı bulunmuyor.</td>
+                                        </tr>
+                                    ` : groupedMembers.map(m => `
                                         <tr class="hover:bg-slate-800/50">
-                                            <td class="px-4 py-3 font-semibold text-slate-100">${f.memberName}</td>
-                                            <td class="px-4 py-3 text-blue-400 font-bold">${f.month}</td>
-                                            <td class="px-4 py-3 text-slate-400">${f.year}</td>
-                                            <td class="px-4 py-3 text-emerald-400 font-bold">₺${f.amount}</td>
-                                            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400">Ödendi</span></td>
-                                            <td class="px-4 py-3 text-right"><button onclick="deleteDue('${f.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></td>
+                                            <td class="px-4 py-3 font-semibold text-slate-100 align-top">${m.memberName}</td>
+                                            <td class="px-4 py-3 align-top">
+                                                <div class="flex flex-wrap gap-1.5">
+                                                    ${m.records.map(rec => `
+                                                        <span class="inline-flex items-center gap-1.5 bg-slate-950 border border-slate-800 text-blue-400 px-2 py-1 rounded-md text-[11px] font-medium">
+                                                            <span>${rec.month} ${rec.year}</span>
+                                                            <span class="text-emerald-400 font-bold">₺${rec.amount}</span>
+                                                            <button onclick="deleteDue('${rec.id}')" class="text-slate-500 hover:text-red-400 ml-1 cursor-pointer" title="Bu kaydı sil">
+                                                                <i class="fa-solid fa-xmark text-[10px]"></i>
+                                                            </button>
+                                                        </span>
+                                                    `).join('')}
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-3 text-emerald-400 font-bold align-top">₺${m.totalAmount.toLocaleString()}</td>
+                                            <td class="px-4 py-3 text-right align-top">
+                                                <span class="text-[10px] text-slate-500 italic">${m.records.length} Dönem Ödendi</span>
+                                            </td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -996,7 +1035,6 @@
                 }
                 const ctxFee = document.getElementById('chartFeeTrend');
                 if (ctxFee && checkIsYonetim(state.currentUser?.role)) {
-                    // Gerçek Supabase verilerinden aylık aidat dağılımını hesapla
                     const monthsOrder = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
                     const monthTotals = {};
                     monthsOrder.forEach(m => monthTotals[m] = 0);
