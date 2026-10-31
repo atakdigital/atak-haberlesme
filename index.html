@@ -108,7 +108,7 @@
         let globalAudioCtx = null;
         let realtimeChannel = null;
 
-        // GÜNCELLENMİŞ KESİN YÖNETİM KONTROLÜ (Başkan Yardımcısı, Sayman vb. kelimeleri eksiksiz yakalar)
+        // YÖNETİM YETKİ KONTROLÜ (Başkan Yardımcısı, Sayman, Başkan vb. tüm yönetim rollerine tam yetki verir)
         function checkIsYonetim(roleStr) {
             const role = roleStr || (state.currentUser ? state.currentUser.role : '');
             if (!role) return false;
@@ -126,7 +126,8 @@
             return managementKeywords.some(key => r.includes(key));
         }
 
-        function checkIsBaskan(roleStr) {
+        // BAŞKAN VE BAŞKAN YARDIMCISINA ORTAK TAM BAŞKAN YETKİLERİ (İletişim düzenleme vb.)
+        function checkIsBaskanOrYardimci(roleStr) {
             const role = roleStr || (state.currentUser ? state.currentUser.role : '');
             if (!role) return false;
             const r = role.toString().trim()
@@ -891,8 +892,9 @@
         }
 
         function renderContactView() {
-            const isBaskan = checkIsBaskan(state.currentUser?.role);
-            const managementUsers = state.users.filter(u => checkIsYonetim(u.role) || u.role?.toLowerCase().includes('başkan') || u.role?.toLowerCase().includes('sekreter') || u.role?.toLowerCase().includes('sayman'));
+            // SADECE BAŞKAN VE BAŞKAN YARDIMCISI İLETİŞİM BİLGİLERİNİ DÜZENLEYEBİLİR (NORMAL ÜYELERE KAPALI)
+            const isBaskanOrYardimci = checkIsBaskanOrYardimci(state.currentUser?.role);
+            const managementUsers = state.users.filter(u => checkIsYonetim(u.role));
             
             return `
                 <div class="space-y-6">
@@ -901,7 +903,7 @@
                             <h2 class="text-lg font-bold text-slate-100">📞 İletişim & Dernek Yetkilileri</h2>
                             <p class="text-xs text-slate-400">Dernek yönetimi ve iletişim bilgileri</p>
                         </div>
-                        ${isBaskan ? `<button onclick="openEditContactModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer shadow-md shadow-red-600/30 flex items-center space-x-1.5"><i class="fa-solid fa-pen-to-square"></i><span>Bilgileri Düzenle</span></button>` : ''}
+                        ${isBaskanOrYardimci ? `<button onclick="openEditContactModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer shadow-md shadow-red-600/30 flex items-center space-x-1.5"><i class="fa-solid fa-pen-to-square"></i><span>Bilgileri Düzenle</span></button>` : ''}
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-3">
@@ -936,7 +938,7 @@
         }
 
         function openEditContactModal() {
-            if (!checkIsBaskan(state.currentUser?.role)) return;
+            if (!checkIsBaskanOrYardimci(state.currentUser?.role)) return;
             openModal("İletişim Bilgilerini Düzenle", `
                 <form onsubmit="handleSaveContactInfo(event)" class="space-y-3">
                     <div><label class="block text-xs text-slate-400 mb-1">Dernek Merkezi</label><input type="text" id="cnt-center" required value="${state.contactInfo.center || ''}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
@@ -950,7 +952,7 @@
 
         async function handleSaveContactInfo(e) {
             e.preventDefault();
-            if (!checkIsBaskan(state.currentUser?.role)) return;
+            if (!checkIsBaskanOrYardimci(state.currentUser?.role)) return;
             const newContact = {
                 center: document.getElementById('cnt-center').value,
                 emergency_channel: document.getElementById('cnt-emer').value,
