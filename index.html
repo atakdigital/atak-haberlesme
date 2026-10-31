@@ -684,25 +684,7 @@
             }
         };
 
-        // RÖLE (REPEATER) Görünümü ve Konum Alanı Eklenmiş Modal
-        function renderRadioView() {
-            const isY = checkIsYonetim(state.currentUser?.role);
-            return `
-                <div class="space-y-6">
-                    <div class="flex items-center justify-between"><div><h2 class="text-lg font-bold text-slate-100">Afet & Telsiz Sahası Durumu</h2></div>${isY ? `<button onclick="openAddRepeaterModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Röle Ekle</button>` : ''}</div>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        ${state.repeaters.map(r => `
-                            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl relative">
-                                <div class="flex items-center justify-between mb-2"><span class="font-bold text-red-400 font-mono text-sm">${r.name}</span><span class="px-2 py-0.5 bg-emerald-950 text-emerald-400 text-[10px] font-bold rounded">ONLINE</span></div>
-                                <div class="text-xs text-slate-300">Frekans: ${r.frequency}</div><div class="text-xs text-slate-400">Konum: ${r.location || '-'}</div>
-                                ${isY ? `<button onclick="deleteRepeater('${r.id}')" class="absolute top-3 right-3 text-slate-500 hover:text-red-400 text-xs cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>` : ''}
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-        }
-
+        // DERNEK GİDERLERİ GÖRÜNÜMÜ (Tarih Alanı Eklendi)
         function renderExpensesView() {
             if (!checkIsYonetim(state.currentUser?.role)) {
                 return `<div class="bg-slate-900 border border-slate-800 p-8 rounded-xl text-center space-y-3"><i class="fa-solid fa-triangle-exclamation text-3xl text-amber-500"></i><h3 class="text-base font-bold text-slate-100">Yetkisiz Erişim</h3><p class="text-xs text-slate-400">Bu sayfayı görüntüleme yetkiniz bulunmamaktadır.</p></div>`;
@@ -733,13 +715,31 @@
                                             <td class="px-4 py-3 font-semibold text-slate-100">${e.title}</td>
                                             <td class="px-4 py-3 text-slate-300">${e.paid_to || '-'}</td>
                                             <td class="px-4 py-3 text-red-400 font-bold">₺${e.amount}</td>
-                                            <td class="px-4 py-3 text-slate-400">${e.date || '2026-10'}</td>
+                                            <td class="px-4 py-3 text-slate-400 font-mono">${e.date || '2026-10-31'}</td>
                                             <td class="px-4 py-3 text-right"><button onclick="deleteExpense('${e.id}')" class="text-slate-500 hover:text-red-400 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderRadioView() {
+            const isY = checkIsYonetim(state.currentUser?.role);
+            return `
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between"><div><h2 class="text-lg font-bold text-slate-100">Afet & Telsiz Sahası Durumu</h2></div>${isY ? `<button onclick="openAddRepeaterModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg cursor-pointer">+ Röle Ekle</button>` : ''}</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        ${state.repeaters.map(r => `
+                            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl relative">
+                                <div class="flex items-center justify-between mb-2"><span class="font-bold text-red-400 font-mono text-sm">${r.name}</span><span class="px-2 py-0.5 bg-emerald-950 text-emerald-400 text-[10px] font-bold rounded">ONLINE</span></div>
+                                <div class="text-xs text-slate-300">Frekans: ${r.frequency}</div><div class="text-xs text-slate-400">Konum: ${r.location || '-'}</div>
+                                ${isY ? `<button onclick="deleteRepeater('${r.id}')" class="absolute top-3 right-3 text-slate-500 hover:text-red-400 text-xs cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>` : ''}
+                            </div>
+                        `).join('')}
                     </div>
                 </div>
             `;
@@ -782,7 +782,7 @@
                             <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-2 relative">
                                 <div class="flex items-center justify-between">
                                     <h4 class="font-bold text-slate-100 text-base">${a.title}</h4>
-                                    <span class="text-xs text-red-400 font-mono">${a.activity_date || a.created_at?.slice(0,10) || '2026-10'}</span>
+                                    <span class="text-xs text-red-400 font-mono">${a.activity_date || a.created_at?.slice(0,10) || '2026-10-31'}</span>
                                 </div>
                                 <p class="text-xs text-slate-300"><strong class="text-red-400">Konum:</strong> ${a.location || 'Belirtilmemiş'}</p>
                                 <p class="text-xs text-slate-400 bg-slate-950 p-3 rounded-lg border border-slate-800"><strong class="text-slate-200">Açıklama:</strong> ${a.description || 'Açıklama girilmemiş.'}</p>
@@ -857,14 +857,17 @@
             render();
         }
 
+        // DERNEK GİDERİ EKLEME MODALI (Tarih Alanı Eklendi)
         function openAddExpenseModal() {
             if (!checkIsYonetim(state.currentUser?.role)) return;
+            const todayStr = new Date().toISOString().slice(0,10);
             openModal("Dernek Gideri Ekle", `
                 <form onsubmit="handleAddExpense(event)" class="space-y-3">
                     <div><label class="block text-xs text-slate-400 mb-1">Gider Adı</label><input type="text" id="exp-title" required placeholder="Örn: Elektrik Faturası" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
                     <div><label class="block text-xs text-slate-400 mb-1">Nereye Ödendi / Açıklama</label><input type="text" id="exp-paid" required placeholder="Örn: GDZ Elektrik A.Ş." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
                     <div><label class="block text-xs text-slate-400 mb-1">Tutar (₺)</label><input type="number" id="exp-amount" required placeholder="1250" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
-                    <button type="submit" class="w-full bg-red-600 hover:bg-red-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer">Gideri Kaydet</button>
+                    <div><label class="block text-xs text-slate-400 mb-1">Ödeme / Harcama Tarihi</label><input type="date" id="exp-date" required value="${todayStr}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer mt-2">Gideri Kaydet</button>
                 </form>
             `);
         }
@@ -875,8 +878,9 @@
             const title = document.getElementById('exp-title').value;
             const paid_to = document.getElementById('exp-paid').value;
             const amount = parseFloat(document.getElementById('exp-amount').value);
+            const date = document.getElementById('exp-date').value;
 
-            const { error } = await supabaseClient.from('expenses').insert([{ title, paid_to, amount, date: new Date().toISOString().slice(0,10) }]);
+            const { error } = await supabaseClient.from('expenses').insert([{ title, paid_to, amount, date }]);
             if (error) {
                 showNotification("Gider Ekleme Hatası: " + error.message, 'danger');
             } else {
@@ -887,7 +891,6 @@
             }
         }
 
-        // GÜNCELLENMİŞ RÖLE EKLEME MODALI (Konum Alanı Eklendi)
         function openAddRepeaterModal() {
             if (!checkIsYonetim(state.currentUser?.role)) return;
             openModal("Röle Ekle", `
