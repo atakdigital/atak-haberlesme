@@ -193,9 +193,11 @@
             }
         }
 
+        // OTURUM VE GÜNCEL VERİ TABANI ROL KONTROLÜ
         async function checkSession() {
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (session) {
+                // Önce veritabanından en güncel üye kaydını çek
                 const { data: member } = await supabaseClient.from('members').select('*').eq('id', session.user.id).single();
                 if (member) {
                     state.currentUser = member;
@@ -206,6 +208,15 @@
                 state.currentUser = null;
             }
             await fetchAllData();
+            
+            // Veri çekildikten sonra güncel rolsüz kalmamak adına currentUser'ı users listesinden tazele
+            if (state.currentUser && state.currentUser.id) {
+                const refreshed = state.users.find(u => u.id === state.currentUser.id);
+                if (refreshed) {
+                    state.currentUser = refreshed;
+                }
+            }
+
             initRealtimeListener();
             render();
         }
@@ -297,7 +308,14 @@
                     }
                     render();
                 })
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, async () => { await fetchAllData(); render(); })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, async () => { 
+                    await fetchAllData(); 
+                    if (state.currentUser) {
+                        const refreshed = state.users.find(u => u.id === state.currentUser.id);
+                        if (refreshed) state.currentUser = refreshed;
+                    }
+                    render(); 
+                })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'dues' }, async () => { await fetchAllData(); render(); })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, async () => { await fetchAllData(); render(); })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'repeaters' }, async () => { await fetchAllData(); render(); })
@@ -339,12 +357,7 @@
             if (error) {
                 showNotification("Giriş Hatası: " + error.message, 'danger');
             } else { 
-                const { data: { session } } = await supabaseClient.auth.getSession();
-                if (session) {
-                    const { data: member } = await supabaseClient.from('members').select('*').eq('id', session.user.id).single();
-                    state.currentUser = member || { id: session.user.id, email: session.user.email, full_name: session.user.email, role: 'Normal Üye', callsign: 'TA1XXX' };
-                }
-                await fetchAllData();
+                await checkSession();
                 state.activeTab = 'dashboard';
                 render();
                 showNotification("Başarıyla giriş yapıldı."); 
@@ -892,7 +905,6 @@
         }
 
         function renderContactView() {
-            // SADECE BAŞKAN VE BAŞKAN YARDIMCISI İLETİŞİM BİLGİLERİNİ DÜZENLEYEBİLİR (NORMAL ÜYELERE KAPALI)
             const isBaskanOrYardimci = checkIsBaskanOrYardimci(state.currentUser?.role);
             const managementUsers = state.users.filter(u => checkIsYonetim(u.role));
             
