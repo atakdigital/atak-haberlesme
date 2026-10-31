@@ -108,6 +108,7 @@
         let globalAudioCtx = null;
         let realtimeChannel = null;
 
+        // GÜÇLENDİRİLMİŞ YÖNETİM KONTROLÜ (Başkan Yardımcısı, Başkan, Sekreter, Sayman vb. sorunsuz tanınır)
         function checkIsYonetim(roleStr) {
             const role = roleStr || (state.currentUser ? state.currentUser.role : '');
             if (!role) return false;
@@ -121,7 +122,7 @@
                 return false;
             }
 
-            const managementKeywords = ['baskan', 'sekreter', 'sayman', 'yonetim', 'admin', 'kurul'];
+            const managementKeywords = ['baskan', 'yardimcisi', 'sekreter', 'sayman', 'yonetim', 'admin', 'kurul'];
             return managementKeywords.some(key => r.includes(key));
         }
 
@@ -608,7 +609,6 @@
             `;
         }
 
-        // AİDAT GÖRÜNÜMÜ - SADECE YÖNETİM EKİBİNE AÇIK (YETKİSİZLER İÇİN KISITLI)
         function renderFeesView() {
             const isY = checkIsYonetim(state.currentUser?.role);
             if (!isY) {
@@ -763,7 +763,6 @@
             }
         };
 
-        // DERNEK GİDERLERİ - SADECE YÖNETİM EKİBİNE AÇIK
         function renderExpensesView() {
             if (!checkIsYonetim(state.currentUser?.role)) {
                 return `
