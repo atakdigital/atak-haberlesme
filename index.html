@@ -90,6 +90,7 @@
             activities: [],
             repeaters: [],
             reports: [],
+            chatMessages: [],
             disasterMode: false,
             userAcknowledgedDisaster: false,
             activeTab: 'dashboard',
@@ -190,7 +191,7 @@
 
         async function fetchAllData() {
             try {
-                const [mRes, dRes, expRes, aRes, rRes, repRes, repPortRes, sysRes] = await Promise.all([
+                const [mRes, dRes, expRes, aRes, rRes, repRes, repPortRes, chatRes, sysRes] = await Promise.all([
                     supabaseClient.from('members').select('*'),
                     supabaseClient.from('dues').select('*, members(full_name)'),
                     supabaseClient.from('expenses').select('*'),
@@ -198,6 +199,7 @@
                     supabaseClient.from('field_activities').select('*'),
                     supabaseClient.from('repeaters').select('*'),
                     supabaseClient.from('reports').select('*'),
+                    supabaseClient.from('chat_messages').select('*').order('created_at', { ascending: true }),
                     supabaseClient.from('system_settings').select('*').eq('key', 'disaster_mode').single()
                 ]);
 
@@ -216,6 +218,7 @@
                 if (rRes.data) state.activities = rRes.data;
                 if (repRes.data) state.repeaters = repRes.data;
                 if (repPortRes.data) state.reports = repPortRes.data;
+                if (chatRes.data) state.chatMessages = chatRes.data;
                 
                 const prevDisasterState = state.disasterMode;
                 if (sysRes.data) state.disasterMode = sysRes.data.value === 'true';
@@ -235,7 +238,7 @@
         function initRealtimeListener() {
             const channel = supabaseClient.channel('db-changes');
 
-            ['members', 'dues', 'expenses', 'field_activities', 'announcements', 'system_settings', 'repeaters', 'reports'].forEach(tableName => {
+            ['members', 'dues', 'expenses', 'field_activities', 'announcements', 'system_settings', 'repeaters', 'reports', 'chat_messages'].forEach(tableName => {
                 channel.on(
                     'postgres_changes',
                     { event: '*', schema: 'public', table: tableName },
@@ -427,7 +430,7 @@
                         </div>
                         ${isY ? `
                             <button onclick="toggleDisasterMode()" class="ml-6 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-2 ${state.disasterMode ? 'bg-red-600 text-white disaster-pulse animate-bounce' : 'bg-red-950/40 text-red-400 border border-red-800'} cursor-pointer">
-                                <i class="fa-solid fa-triangle-exclamation"></i><span>${state.disasterMode ? 'AFET MODU AKTİF (KAPAT)' : 'AFET MODUNU TETİKLE'}</span>
+                                <i class="fa-solid fa-triangle-exclamation"><span>${state.disasterMode ? 'AFET MODU AKTİF (KAPAT)' : 'AFET MODUNU TETİKLE'}</span></i>
                             </button>
                         ` : ''}
                     </div>
@@ -442,6 +445,7 @@
             `;
         }
 
+        // GÜNCELLENMİŞ SOL MENÜ: Duyurular Altına "İletişim" ve "Sohbet Odası" Eklendi
         function renderSidebar() {
             const isY = checkIsYonetim(state.currentUser?.role);
             let tabs = [
@@ -452,7 +456,9 @@
                 { id: 'radio', label: 'Afet & Telsiz Sahası', icon: 'fa-tower-cell' },
                 { id: 'reports', label: 'Raporlar', icon: 'fa-chart-column' },
                 { id: 'activities', label: 'Saha Faaliyetleri', icon: 'fa-person-hiking' },
-                { id: 'announcements', label: 'Duyurular', icon: 'fa-bullhorn' }
+                { id: 'announcements', label: 'Duyurular', icon: 'fa-bullhorn' },
+                { id: 'contact', label: 'İletişim', icon: 'fa-address-book' },
+                { id: 'chat', label: 'Sohbet Odası', icon: 'fa-comments' }
             ];
 
             if (isY) {
@@ -543,14 +549,12 @@
             `;
         }
 
-        // GÜNCELLENMİŞ AİDAT GÖRÜNÜMÜ: Üyeler Sadece Kendi Aidatını Görür (Salt Okunur), Yönetim Hepsini Görür ve Düzenler
         function renderFeesView() {
             const isY = checkIsYonetim(state.currentUser?.role);
             const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
             const currentYear = 2026;
             const currentMonthIndex = new Date().getMonth();
 
-            // Yönetim ise TÜM kullanıcıları göster, Normal üye ise SADECE KENDİSİNİ göster
             let displayUsers = state.users;
             if (!isY) {
                 displayUsers = state.users.filter(u => u.id === state.currentUser?.id);
@@ -573,7 +577,6 @@
                                 Üye bilginiz bulunamadı.
                             </div>
                         ` : displayUsers.map(u => {
-                            // Normal kullanıcı için varsayılan olarak hep açık tutalım ya da tıklayıp kapatsın
                             const isExpanded = isY ? (state.expandedFeeMemberId === u.id) : (state.expandedFeeMemberId !== u.id);
                             const memberFees = state.fees.filter(f => f.member_id === u.id && f.year === currentYear);
 
@@ -824,6 +827,115 @@
             `;
         }
 
+        // YENİ EKLENEN İLETİŞİM GÖRÜNÜMÜ
+        function renderContactView() {
+            const managementUsers = state.users.filter(u => checkIsYonetim(u.role) || u.role?.toLowerCase().includes('başkan') || u.role?.toLowerCase().includes('sekreter') || u.role?.toLowerCase().includes('sayman'));
+            return `
+                <div class="space-y-6">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-100">📞 İletişim & Dernek Yetkilileri</h2>
+                        <p class="text-xs text-slate-400">Dernek yönetimi ve iletişim bilgileri</p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-3">
+                            <h4 class="font-bold text-red-500 text-sm">Merkez İletişim Bilgileri</h4>
+                            <div class="text-xs text-slate-300 space-y-2">
+                                <p><strong class="text-slate-100">Dernek Merkezi:</strong> İzmir, Türkiye</p>
+                                <p><strong class="text-slate-100">Acil Telsiz Çağrı Kanalı:</strong> 439.2625 MHz</p>
+                                <p><strong class="text-slate-100">Saha Frekansı:</strong> 433.475 MHz</p>
+                                <p><strong class="text-slate-100">E-posta:</strong> iletisim@atakhaberlesme.org</p>
+                            </div>
+                        </div>
+                        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl space-y-3">
+                            <h4 class="font-bold text-red-500 text-sm">Yönetim Kurulu İletişim</h4>
+                            <div class="space-y-2">
+                                ${managementUsers.length === 0 ? `<p class="text-xs text-slate-500 italic">Yönetici bilgisi bulunamadı.</p>` : managementUsers.map(m => `
+                                    <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 text-xs flex items-center justify-between">
+                                        <div>
+                                            <div class="font-bold text-slate-100">${m.full_name} <span class="text-red-400 font-mono">(${m.callsign || 'TA1XXX'})</span></div>
+                                            <div class="text-amber-400 text-[11px]">${m.role}</div>
+                                        </div>
+                                        <div class="text-right text-slate-300 font-mono">
+                                            <div>${m.phone || 'Telefon Yok'}</div>
+                                            <div class="text-[10px] text-slate-400">${m.email}</div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // YENİ EKLENEN SOHBET ODASI GÖRÜNÜMÜ (Anlık Chat)
+        function renderChatView() {
+            return `
+                <div class="space-y-4 h-[calc(100vh-140px)] flex flex-col">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-100">💬 Dernek Sohbet Odası</h2>
+                        <p class="text-xs text-slate-400">Tüm üyeler ile anlık mesajlaşma alanı</p>
+                    </div>
+
+                    <div class="flex-1 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between overflow-hidden shadow-xl">
+                        <!-- MESAJLAR LİSTESİ -->
+                        <div id="chat-messages-container" class="flex-1 overflow-y-auto space-y-3 pr-2">
+                            ${state.chatMessages.length === 0 ? `
+                                <div class="text-center text-slate-500 italic text-xs py-10">
+                                    Henüz mesaj yazılmamış. İlk mesajı siz gönderin!
+                                </div>
+                            ` : state.chatMessages.map(msg => {
+                                const isMe = msg.sender_id === state.currentUser?.id;
+                                return `
+                                    <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
+                                        <div class="flex items-center space-x-2 mb-1">
+                                            <span class="text-[11px] font-bold text-red-400">${msg.sender_name}</span>
+                                            <span class="text-[10px] text-slate-500 font-mono">${msg.created_at ? msg.created_at.slice(11, 16) : ''}</span>
+                                        </div>
+                                        <div class="max-w-[75%] px-4 py-2.5 rounded-2xl text-xs leading-relaxed ${isMe ? 'bg-red-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-none'}">
+                                            ${msg.message}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+
+                        <!-- MESAJ GÖNDERME FORMU -->
+                        <form onsubmit="handleSendChatMessage(event)" class="mt-4 pt-3 border-t border-slate-800 flex items-center space-x-2">
+                            <input type="text" id="chat-input" required autocomplete="off" placeholder="Mesajınızı yazın..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-100 focus:outline-none focus:border-red-600">
+                            <button type="submit" class="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-xl text-xs font-bold cursor-pointer transition shadow-lg shadow-red-600/30">
+                                <i class="fa-solid fa-paper-plane mr-1"></i> Gönder
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function handleSendChatMessage(e) {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const { error } = await supabaseClient.from('chat_messages').insert([{
+                sender_id: state.currentUser.id,
+                sender_name: `${state.currentUser.full_name} (${state.currentUser.callsign || 'TA1XXX'})`,
+                message: message
+            }]);
+
+            if (error) {
+                showNotification("Mesaj gönderilemedi: " + error.message, 'danger');
+            } else {
+                input.value = '';
+                await fetchAllData();
+                render();
+                // Aşağı kaydır
+                const container = document.getElementById('chat-messages-container');
+                if (container) container.scrollTop = container.scrollHeight;
+            }
+        }
+
         function renderMobileSimulatorView() {
             if (!checkIsYonetim(state.currentUser?.role)) {
                 return `<div class="bg-slate-900 border border-slate-800 p-8 rounded-xl text-center space-y-3"><i class="fa-solid fa-triangle-exclamation text-3xl text-amber-500"></i><h3 class="text-base font-bold text-slate-100">Yetkisiz Erişim</h3><p class="text-xs text-slate-400">Bu sayfayı görüntüleme yetkiniz bulunmamaktadır.</p></div>`;
@@ -1045,6 +1157,8 @@
                 case 'reports': content = renderReportsView(); break;
                 case 'activities': content = renderActivitiesView(); break;
                 case 'announcements': content = renderAnnouncementsView(); break;
+                case 'contact': content = renderContactView(); break;
+                case 'chat': content = renderChatView(); break;
                 case 'mobile': 
                     if (checkIsYonetim(state.currentUser?.role)) {
                         content = renderMobileSimulatorView(); 
@@ -1075,6 +1189,12 @@
                 </div>
             `;
             setTimeout(initCharts, 50);
+
+            // Sohbet odasındaysa scroll'u en aşağıya indir
+            if (state.activeTab === 'chat') {
+                const container = document.getElementById('chat-messages-container');
+                if (container) container.scrollTop = container.scrollHeight;
+            }
         }
 
         function initCharts() {
