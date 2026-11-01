@@ -109,6 +109,7 @@
         let bloodChartInstance = null;
         let feeChartInstance = null;
 
+        // YÖNETİM ROLÜ KONTROLÜ (Yönetim Kurulu Üyesi dahil tüm yönetim rollerine tam yetki tanır)
         function checkIsYonetim(roleStr) {
             const role = roleStr || (state.currentUser ? state.currentUser.role : '');
             if (!role) return false;
@@ -627,14 +628,12 @@
             `;
         }
 
-        // GÜNCELLENMİŞ AİDAT GÖRÜNÜMÜ (Normal üyeler sadece kendi aidatını görür, düzenleyemez)
         function renderFeesView() {
             const isY = checkIsYonetim(state.currentUser?.role);
             const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
             const currentYear = 2026;
             const currentMonthIndex = new Date().getMonth();
 
-            // Yönetim tüm üyeleri görür, normal üye sadece kendisini görür
             const displayedUsers = isY ? state.users : state.users.filter(u => u.id === state.currentUser?.id);
 
             return `
@@ -1114,7 +1113,7 @@
                     <div><label class="block text-xs text-slate-400 mb-1">Callsign</label><input type="text" id="edit-callsign" value="${member.callsign || ''}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
                     <div><label class="block text-xs text-slate-400 mb-1">Kan Grubu</label><select id="edit-blood" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">${['A Rh+', 'A Rh-', 'B Rh+', 'B Rh-', '0 Rh+', '0 Rh-', 'AB Rh+', 'AB Rh-'].map(b => `<option ${member.blood === b ? 'selected' : ''}>${b}</option>`).join('')}</select></div>
                     <div><label class="block text-xs text-slate-400 mb-1">Telefon Numarası</label><input type="tel" id="edit-phone" value="${member.phone || ''}" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"></div>
-                    <div><label class="block text-xs text-slate-400 mb-1">Yönetim Rolü</label><select id="edit-role" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">${['Yönetim Kurulu Başkanı', 'Başkan Yardımcısı', 'Genel Sekreter', 'Sayman', 'Normal Üye'].map(r => `<option ${member.role === r ? 'selected' : ''}>${r}</option>`).join('')}</select></div>
+                    <div><label class="block text-xs text-slate-400 mb-1">Yönetim Rolü</label><select id="edit-role" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100">${['Yönetim Kurulu Başkanı', 'Başkan Yardımcısı', 'Genel Sekreter', 'Sayman', 'Yönetim Kurulu Üyesi', 'Normal Üye'].map(r => `<option ${member.role === r ? 'selected' : ''}>${r}</option>`).join('')}</select></div>
                     <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg text-xs font-bold cursor-pointer mt-2">Kaydet</button>
                 </form>
             `);
