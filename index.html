@@ -109,7 +109,6 @@
         let bloodChartInstance = null;
         let feeChartInstance = null;
 
-        // KESİN YÖNETİM YETKİ KONTROLÜ (Başkan Yardımcısı ve diğer yönetim rollerine tam yetki tanır)
         function checkIsYonetim(roleStr) {
             const role = roleStr || (state.currentUser ? state.currentUser.role : '');
             if (!role) return false;
@@ -122,8 +121,6 @@
             if (r.includes('normal') || r === 'uye' || r === 'üye') {
                 return false;
             }
-
-            // Başkan Yardımcısı, Başkan, Sayman, Sekreter, Yönetim vb. tüm yönetim rollerine doğrudan true döner
             return true;
         }
 
@@ -185,10 +182,12 @@
             }
         }
 
+        // SİLİNEN ÜYELERİN GİRİŞ YAPMASINI ENGELLEYEN OTURUM KONTROLÜ
         async function checkSession() {
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (session) {
                 const { data: member } = await supabaseClient.from('members').select('*').eq('id', session.user.id).maybeSingle();
+                
                 if (member) {
                     state.currentUser = member;
                 } else {
@@ -196,18 +195,28 @@
                     if (memberByEmail) {
                         state.currentUser = memberByEmail;
                     } else {
-                        state.currentUser = { id: session.user.id, email: session.user.email, full_name: session.user.email, role: 'Başkan Yardımcısı', callsign: 'TA1XXX' };
+                        // ÜYE TABLOSUNDAN SİLİNMİŞSE OTURUMU KAPAT VE ENGELE
+                        await supabaseClient.auth.signOut();
+                        state.currentUser = null;
+                        showNotification("Hesabınız silinmiş veya yetkiniz iptal edilmiştir. Giriş yapılamaz.", 'danger');
+                        render();
+                        return;
                     }
                 }
             } else {
                 state.currentUser = null;
             }
+
             await fetchAllData();
 
             if (state.currentUser) {
                 const matchedUser = state.users.find(u => u.id === state.currentUser.id || (u.email && u.email.toLowerCase() === state.currentUser.email.toLowerCase()));
                 if (matchedUser) {
                     state.currentUser = matchedUser;
+                } else {
+                    await supabaseClient.auth.signOut();
+                    state.currentUser = null;
+                    showNotification("Hesabınız dernek üye listesinde bulunamadı.", 'danger');
                 }
             }
 
@@ -274,16 +283,11 @@
 
             realtimeChannel = supabaseClient.channel('global-live-channel')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, async (payload) => {
-                    if (payload.eventType === 'INSERT') {
-                        state.chatMessages.push(payload.new);
-                        render();
-                        const container = document.getElementById('chat-messages-container');
-                        if (container) container.scrollTop = container.scrollHeight;
-                    } else {
-                        const { data } = await supabaseClient.from('chat_messages').select('*').order('created_at', { ascending: true });
-                        if (data) state.chatMessages = data;
-                        render();
-                    }
+                    const { data } = await supabaseClient.from('chat_messages').select('*').order('created_at', { ascending: true });
+                    if (data) state.chatMessages = data;
+                    render();
+                    const container = document.getElementById('chat-messages-container');
+                    if (container) container.scrollTop = container.scrollHeight;
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'system_settings' }, async (payload) => {
                     if (payload.new && payload.new.key === 'disaster_mode') {
@@ -306,7 +310,13 @@
                     await fetchAllData(); 
                     if (state.currentUser) {
                         const refreshed = state.users.find(u => u.id === state.currentUser.id || (u.email && u.email.toLowerCase() === state.currentUser.email.toLowerCase()));
-                        if (refreshed) state.currentUser = refreshed;
+                        if (refreshed) {
+                            state.currentUser = refreshed;
+                        } else {
+                            await supabaseClient.auth.signOut();
+                            state.currentUser = null;
+                            showNotification("Hesabınız silindiği için oturum kapatıldı.", "danger");
+                        }
                     }
                     render(); 
                 })
@@ -352,9 +362,11 @@
                 showNotification("Giriş Hatası: " + error.message, 'danger');
             } else { 
                 await checkSession();
-                state.activeTab = 'dashboard';
-                render();
-                showNotification("Başarıyla giriş yapıldı."); 
+                if (state.currentUser) {
+                    state.activeTab = 'dashboard';
+                    render();
+                    showNotification("Başarıyla giriş yapıldı."); 
+                }
             }
         }
 
@@ -979,12 +991,37 @@
             }
         }
 
+        // TARİH VE SAAT BİRLİKTE FORMATLAMA FONKSİYONU
+        function formatDateTime(isoString) {
+            if (!isoString) return '';
+            try {
+                const dateObj = new Date(isoString);
+                const day = String(dateObj.getDate()).padStart(2, '0');
+                const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const year = dateObj.getFullYear();
+                const hours = String(dateObj.getHours()).padStart(2, '0');
+                const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+                return `${day}.${month}.${year} ${hours}:${minutes}`;
+            } catch (e) {
+                return isoString;
+            }
+        }
+
+        // SOHBET ODASI (SİLME BUTONU VE TARİH/SAAT DETAYI EKLENDİ)
         function renderChatView() {
+            const isY = checkIsYonetim(state.currentUser?.role);
             return `
                 <div class="space-y-4 h-[calc(100vh-140px)] flex flex-col">
-                    <div>
-                        <h2 class="text-lg font-bold text-slate-100">💬 Dernek Sohbet Odası</h2>
-                        <p class="text-xs text-slate-400">Tüm üyeler ile anlık mesajlaşma alanı</p>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-100">💬 Dernek Sohbet Odası</h2>
+                            <p class="text-xs text-slate-400">Tüm üyeler ile anlık mesajlaşma alanı</p>
+                        </div>
+                        ${isY ? `
+                            <button onclick="clearChatHistory()" class="px-3 py-1.5 bg-red-950 hover:bg-red-900 border border-red-800 text-red-300 text-xs font-semibold rounded-lg cursor-pointer transition flex items-center space-x-1.5 shadow-md shadow-red-950/50">
+                                <i class="fa-solid fa-trash-can"></i><span>Sohbeti Temizle</span>
+                            </button>
+                        ` : ''}
                     </div>
 
                     <div class="flex-1 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between overflow-hidden shadow-xl">
@@ -995,11 +1032,12 @@
                                 </div>
                             ` : state.chatMessages.map(msg => {
                                 const isMe = msg.sender_id === state.currentUser?.id;
+                                const formattedTime = formatDateTime(msg.created_at);
                                 return `
                                     <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
                                         <div class="flex items-center space-x-2 mb-1">
                                             <span class="text-[11px] font-bold text-red-400">${msg.sender_name}</span>
-                                            <span class="text-[10px] text-slate-500 font-mono">${msg.created_at ? msg.created_at.slice(11, 16) : ''}</span>
+                                            <span class="text-[10px] text-slate-500 font-mono">${formattedTime}</span>
                                         </div>
                                         <div class="max-w-[75%] px-4 py-2.5 rounded-2xl text-xs leading-relaxed ${isMe ? 'bg-red-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-none'}">
                                             ${msg.message}
@@ -1019,6 +1057,21 @@
                 </div>
             `;
         }
+
+        // SOHBETİ TAMAMEN TEMİZLEME İŞLEMİ
+        window.clearChatHistory = async function() {
+            if (!checkIsYonetim(state.currentUser?.role)) return;
+            if (!confirm("Sohbet odasındaki TÜM mesajları silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) return;
+
+            const { error } = await supabaseClient.from('chat_messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+            if (error) {
+                showNotification("Sohbet temizlenirken hata oluştu: " + error.message, "danger");
+            } else {
+                state.chatMessages = [];
+                render();
+                showNotification("Sohbet odası başarıyla temizlendi.", "info");
+            }
+        };
 
         async function handleSendChatMessage(e) {
             e.preventDefault();
